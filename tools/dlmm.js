@@ -22,6 +22,7 @@ import {
   getTrackedPosition,
   minutesOutOfRange,
   syncOpenPositions,
+  updateClosedPnL,
 } from "../state.js";
 import { recordPerformance } from "../lessons.js";
 import { isBaseMintOnCooldown, isPoolOnCooldown } from "../pool-memory.js";
@@ -1194,6 +1195,8 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
     pools.forEach((pool, i) => { binDataByPool[pool.poolAddress] = pnlMaps[i]; });
     const lpAgentByPosition = {}; // LPAgent removed — Meteora binData only
 
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+
     const positions = [];
     for (const pool of pools) {
       for (const positionAddress of (pool.listPositions || [])) {
@@ -1212,6 +1215,21 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
         const upperBin  = binData?.upperBinId      ?? tracked?.bin_range?.max ?? null;
         const activeBin = binData?.poolActiveBinId ?? tracked?.bin_range?.active ?? null;
         const lpData = lpAgentByPosition[positionAddress] || null;
+
+        // ── Decimal correction for price display ──────────────────
+        // Meteora DLMM price formula: price = (1 + bin_step/10000)^binId × (10^decimals_X / 10^decimals_Y)
+        // The portfolio API may expose tokenXDecimal / tokenYDecimal.
+        // Fallback: treat SOL (tokenYMint) as 9 decimals, other tokens as 6.
+        const tokenXDec = pool.tokenXDecimal ?? pool.tokenXDecimals ?? 6;
+        const tokenYDec = pool.tokenYMint === SOL_MINT
+          ? 9
+          : (pool.tokenYDecimal ?? pool.tokenYDecimals ?? 6);
+        // e.g. FLKR(6)/SOL(9) → 10^(6-9) = 0.001 (divide raw price by 1000)
+        const decimalMultiplier = Math.pow(10, tokenXDec - tokenYDec);
+
+        // bin_step: prefer live binData, fall back to tracked deploy state
+        const resolvedBinStep = binData?.binStep ?? tracked?.bin_step ?? null;
+
 
         const ageFromState = tracked?.deployed_at
           ? Math.floor((Date.now() - new Date(tracked.deployed_at).getTime()) / 60000)
@@ -1320,6 +1338,8 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
           age_minutes:        binData?.createdAt ? Math.floor((Date.now() - binData.createdAt * 1000) / 60000) : ageFromState,
           minutes_out_of_range: minutesOutOfRange(positionAddress),
           instruction:        tracked?.instruction ?? null,
+          bin_step:           tracked?.bin_step ?? binData?.binStep ?? null,
+          decimal_multiplier: decimalMultiplier,
         });
       }
     }
@@ -1631,6 +1651,7 @@ export async function closePosition({ position_address, reason }) {
                 finalValueUsd = parseFloat(posEntry.allTimeWithdrawals?.total?.usd || 0);
                 initialUsd = parseFloat(posEntry.allTimeDeposits?.total?.usd || 0);
                 feesUsd = parseFloat(posEntry.allTimeFees?.total?.usd || 0) || feesUsd;
+                updateClosedPnL(position_address, pnlPct, pnlUsd, feesUsd);
                 break;
               }
             }
@@ -1719,6 +1740,8 @@ export async function closePosition({ position_address, reason }) {
           txs: txHashes,
           pnl_usd: pnlUsd,
           pnl_pct: pnlPct,
+          fees_usd: feesUsd,
+          minutes_held: minutesHeld,
           base_mint: closeBaseMint,
         };
       }
@@ -1946,6 +1969,8 @@ export async function closePosition({ position_address, reason }) {
         }
       }
 
+      updateClosedPnL(position_address, pnlPct, pnlUsd, feesUsd);
+
       const closeBaseMint = pool.lbPair.tokenXMint.toString();
       const signalSnapshot = resolvePerformanceSignalSnapshot({
         poolAddress,
@@ -2022,6 +2047,8 @@ export async function closePosition({ position_address, reason }) {
         txs: txHashes,
         pnl_usd: pnlUsd,
         pnl_pct: pnlPct,
+        fees_usd: feesUsd,
+        minutes_held: minutesHeld,
         base_mint: closeBaseMint,
       };
     }

@@ -413,6 +413,7 @@ const BOT_COMMANDS = [
   { command: "status",     description: "Wallet + positions snapshot" },
   { command: "wallet",     description: "Wallet, deploy amount, HiveMind status" },
   { command: "positions",  description: "List open positions" },
+  { command: "history",    description: "Show 10 latest closed positions" },
   { command: "pool",       description: "Detailed info for one open position" },
   { command: "close",      description: "Close one position by index" },
   { command: "closeall",   description: "Close all open positions" },
@@ -483,12 +484,21 @@ export async function notifyDeploy({ pair, amountSol, position, tx, priceRange, 
   );
 }
 
-export async function notifyClose({ pair, pnlUsd, pnlPct }) {
+export async function notifyClose({ pair, pnlUsd, pnlPct, feesUsd, minutesHeld, reason }) {
   if (hasActiveLiveMessage()) return;
-  const sign = pnlUsd >= 0 ? "+" : "";
+  const pnlSign = pnlUsd >= 0 ? "+" : "-";
+  const pnlPctSign = pnlPct >= 0 ? "+" : "-";
+  
+  const ageStr = minutesHeld != null ? `${minutesHeld}m` : "?m";
+  const feesStr = feesUsd != null ? `$${Number(feesUsd).toFixed(2)}` : "$--";
+  const pnlStr = `${pnlPctSign}${Math.abs(pnlPct).toFixed(2)}% (${pnlSign}$${Math.abs(pnlUsd).toFixed(2)})`;
+
   await sendHTML(
-    `🔒 <b>Closed</b> ${pair}\n` +
-    `PnL: ${sign}$${(pnlUsd ?? 0).toFixed(2)} (${sign}${(pnlPct ?? 0).toFixed(2)}%)`
+    `🔒 <b>Closed Position</b>\n\n` +
+    `🔹 <b>${pair}</b> (Age: ${ageStr})\n` +
+    ` ├─ 🎁 Fees Claimed: ${feesStr}\n` +
+    ` ├─ 📈 PnL: ${pnlStr}\n` +
+    ` └─ 🛠 Reason: <b>${reason || "autonomous decision"}</b>`
   );
 }
 

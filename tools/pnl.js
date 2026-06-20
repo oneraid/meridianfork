@@ -235,6 +235,8 @@ function buildPosition(f, prices, solUsd, meteora, solMode) {
     age_minutes:        ageMinutes,
     minutes_out_of_range: minutesOutOfRange(f.position),
     instruction:        tracked?.instruction ?? null,
+    bin_step:           f.binStep ?? 100,
+    decimal_multiplier: f.decimalMultiplier ?? 1,
   };
 }
 
@@ -260,6 +262,8 @@ export async function computePositions(walletAddress) {
     const decY = info?.tokenY?.mint?.decimals ?? 9;
     const baseMint = info?.tokenX?.mint?.address?.toString?.() ?? null;
     const active = info?.lbPair?.activeId ?? null;
+    const binStep = info?.lbPair?.binStep ?? 100;
+    const decimalMultiplier = Math.pow(10, decX - decY);
     for (const p of info?.lbPairPositionsData || []) {
       const d = p.positionData || {};
       flat.push({
@@ -275,6 +279,8 @@ export async function computePositions(walletAddress) {
         yRaw: d.totalYAmount,
         feeXRaw: d.feeX?.toString?.() ?? d.feeX ?? 0,
         feeYRaw: d.feeY?.toString?.() ?? d.feeY ?? 0,
+        binStep,
+        decimalMultiplier,
       });
     }
   }

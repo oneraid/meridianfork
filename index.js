@@ -9,7 +9,7 @@ import { getMyPositions, closePosition, getActiveBin } from "./tools/dlmm.js";
 import { getWalletBalances } from "./tools/wallet.js";
 import { getTopCandidates } from "./tools/screening.js";
 import { config, reloadScreeningThresholds, computeDeployAmount } from "./config.js";
-import { evolveThresholds, getPerformanceSummary } from "./lessons.js";
+import { evolveThresholds, getPerformanceSummary, getPerformanceHistory } from "./lessons.js";
 import { executeTool, registerCronRestarter } from "./tools/executor.js";
 import {
   startPolling,
@@ -36,6 +36,7 @@ import { bootstrapHiveMind, ensureAgentId, getHiveMindPullMode, isHiveMindEnable
 import { appendDecision } from "./decision-log.js";
 
 import { REPO_ROOT, repoPath } from "./repo-root.js";
+import { startDashboardServer } from "./server.js";
 
 const entrypointPath = process.env.pm_exec_path || process.argv[1];
 const indexPath = fileURLToPath(import.meta.url);
@@ -212,6 +213,33 @@ export async function runManagementCycle({ silent = false } = {}) {
   let liveMessage = null;
   const screeningCooldownMs = 5 * 60 * 1000;
 
+  // Retrieve SOL price for converting values in notifications
+  let solPrice = 0;
+  try {
+    const balances = await getWalletBalances().catch(() => ({ sol: 0, sol_usd: 0, sol_price: 0 }));
+    solPrice = balances.sol_price || 0;
+  } catch (err) {
+    log("cron_warn", `Failed to get SOL price for notification conversion: ${err.message}`);
+  }
+
+  const solMode = !!config.management?.solMode;
+  const cur = solMode ? "◎" : "$";
+
+  function formatSolUsd(solVal, usdVal) {
+    return usdVal != null ? `$${Number(usdVal).toFixed(2)}` : "$--";
+  }
+
+  function formatPnlSolUsd(pct, solVal, usdVal) {
+    if (pct == null) return "--";
+    const pctSign = pct > 0 ? "+" : "";
+    const usdSign = usdVal != null && usdVal > 0 ? "+" : "";
+    
+    const pctStr = `${pctSign}${Number(pct).toFixed(2)}%`;
+    const usdStr = usdVal != null ? `${usdSign}$${Number(usdVal).toFixed(2)}` : "$--";
+    
+    return `${pctStr} (${usdStr})`;
+  }
+
   try {
     if (!silent && telegramEnabled()) {
       liveMessage = await createLiveMessage("🔄 Management Cycle", "Evaluating positions...");
@@ -289,15 +317,33 @@ export async function runManagementCycle({ silent = false } = {}) {
 
     const reportLines = positionData.map((p) => {
       const act = actionMap.get(p.position);
-      const inRange = p.in_range ? "🟢 IN" : `🔴 OOR ${p.minutes_out_of_range ?? 0}m`;
-      const val = config.management.solMode ? `◎${p.total_value_usd ?? "?"}` : `$${p.total_value_usd ?? "?"}`;
-      const unclaimed = config.management.solMode ? `◎${p.unclaimed_fees_usd ?? "?"}` : `$${p.unclaimed_fees_usd ?? "?"}`;
-      const statusLabel = act.action === "INSTRUCTION" ? "HOLD (instruction)" : act.action;
-      let line = `**${p.pair}** | Age: ${p.age_minutes ?? "?"}m | Val: ${val} | Unclaimed: ${unclaimed} | PnL: ${p.pnl_pct ?? "?"}% | Yield: ${p.fee_per_tvl_24h ?? "?"}% | ${inRange} | ${statusLabel}`;
-      if (p.instruction) line += `\nNote: "${p.instruction}"`;
-      if (act.action === "CLOSE" && act.rule === "exit") line += `\n⚡ Trailing TP: ${act.reason}`;
-      if (act.action === "CLOSE" && act.rule && act.rule !== "exit") line += `\nRule ${act.rule}: ${act.reason}`;
-      if (act.action === "CLAIM") line += `\n→ Claiming fees`;
+      const inRange = p.in_range ? "🟢 In Range" : `🔴 Out of Range (${p.minutes_out_of_range ?? 0}m)`;
+      
+      const valSol = solMode ? p.total_value_usd : (solPrice > 0 ? p.total_value_true_usd / solPrice : 0);
+      const valUsd = p.total_value_true_usd;
+      const unclaimedSol = solMode ? p.unclaimed_fees_usd : (solPrice > 0 ? p.unclaimed_fees_true_usd / solPrice : 0);
+      const unclaimedUsd = p.unclaimed_fees_true_usd;
+      const pnlSol = solMode ? p.pnl_usd : (solPrice > 0 ? p.pnl_true_usd / solPrice : 0);
+      const pnlUsd = p.pnl_true_usd;
+
+      const valStr = formatSolUsd(valSol, valUsd);
+      const unclaimedStr = formatSolUsd(unclaimedSol, unclaimedUsd);
+      const pnlStr = formatPnlSolUsd(p.pnl_pct, pnlSol, pnlUsd);
+
+      const statusLabel = act.action === "INSTRUCTION" ? "EVALUATING INSTRUCTION" : act.action;
+      
+      let line = `🔹 *${p.pair}* (Age: ${p.age_minutes ?? "?"}m)\n`;
+      line += ` ├─ 🏷 Status: ${inRange}\n`;
+      line += ` ├─ 🎁 Unclaimed: ${unclaimedStr}\n`;
+      line += ` ├─ 📈 PnL: ${pnlStr}\n`;
+      line += ` ├─ 💸 Yield: ${p.fee_per_tvl_24h ?? "?"}%\n`;
+      line += ` └─ 🛠 Action: *${statusLabel}*`;
+      
+      if (p.instruction) line += `\n    ├─ 📝 Note: "${p.instruction}"`;
+      if (act.action === "CLOSE" && act.rule === "exit") line += `\n    ├─ ⚡ Exit Alert: ${act.reason}`;
+      if (act.action === "CLOSE" && act.rule && act.rule !== "exit") line += `\n    ├─ ⚠️ Rule ${act.rule}: ${act.reason}`;
+      if (act.action === "CLAIM") line += `\n    └─ 💸 Claiming accumulated fees`;
+      
       return line;
     });
 
@@ -306,9 +352,20 @@ export async function runManagementCycle({ silent = false } = {}) {
       ? needsAction.map(a => a.action === "INSTRUCTION" ? "EVAL instruction" : `${a.action}${a.reason ? ` (${a.reason})` : ""}`).join(", ")
       : "no action";
 
-    const cur = config.management.solMode ? "◎" : "$";
-    mgmtReport = reportLines.join("\n\n") +
-      `\n\nSummary: 💼 ${positions.length} positions | ${cur}${totalValue.toFixed(4)} | fees: ${cur}${totalUnclaimed.toFixed(4)} | ${actionSummary}`;
+    const totalValueSol = solMode ? totalValue : (solPrice > 0 ? positionData.reduce((s, p) => s + (p.total_value_true_usd ?? 0), 0) / solPrice : 0);
+    const totalValueUsd = positionData.reduce((s, p) => s + (p.total_value_true_usd ?? 0), 0);
+    const totalUnclaimedSol = solMode ? totalUnclaimed : (solPrice > 0 ? positionData.reduce((s, p) => s + (p.unclaimed_fees_true_usd ?? 0), 0) / solPrice : 0);
+    const totalUnclaimedUsd = positionData.reduce((s, p) => s + (p.unclaimed_fees_true_usd ?? 0), 0);
+
+    const totalValStr = formatSolUsd(totalValueSol, totalValueUsd);
+    const totalUnclaimedStr = formatSolUsd(totalUnclaimedSol, totalUnclaimedUsd);
+
+    let summaryBlock = `📊 *Summary:*\n`;
+    summaryBlock += ` ├─ 💼 Positions: ${positions.length}\n`;
+    summaryBlock += ` ├─ 🎁 Unclaimed: ${totalUnclaimedStr}\n`;
+    summaryBlock += ` └─ ⚡ Action Plan: *${actionSummary}*`;
+
+    mgmtReport = reportLines.join("\n\n") + `\n\n` + summaryBlock;
 
     // ── Call LLM only if action needed ──────────────────────────────
     const actionPositions = positionData.filter(p => {
@@ -886,10 +943,10 @@ function getDeterministicCloseRule(position, managementConfig) {
     return false;
   })();
 
-  if (!pnlSuspect && position.pnl_pct != null && position.pnl_pct <= managementConfig.stopLossPct) {
+  if (!pnlSuspect && position.pnl_pct != null && managementConfig.stopLossPct != null && position.pnl_pct <= managementConfig.stopLossPct) {
     return { action: "CLOSE", rule: 1, reason: "stop loss" };
   }
-  if (!pnlSuspect && position.pnl_pct != null && position.pnl_pct >= managementConfig.takeProfitPct) {
+  if (!pnlSuspect && position.pnl_pct != null && managementConfig.takeProfitPct != null && position.pnl_pct >= managementConfig.takeProfitPct) {
     return { action: "CLOSE", rule: 2, reason: "take profit" };
   }
   if (
@@ -1247,6 +1304,7 @@ function formatHelpText() {
     "/status — wallet + positions snapshot",
     "/wallet — wallet, deploy amount, HiveMind status",
     "/positions — list open positions",
+    "/history — show 10 latest closed positions",
     "/pool <n> — detailed info for one open position",
     "/close <n> — close one position by index",
     "/closeall — close all open positions",
@@ -1433,6 +1491,29 @@ async function telegramHandler(msg) {
       });
       await sendMessage(`📊 Open Positions (${total_positions}):\n\n${lines.join("\n")}\n\n/close <n> to close | /set <n> <note> to set instruction`);
     } catch (e) { await sendMessage(`Error: ${e.message}`).catch(() => {}); }
+    return;
+  }
+
+  if (text === "/history") {
+    try {
+      const history = getPerformanceHistory({ hours: 999999, limit: 10 });
+      const closed = history.positions || [];
+      if (closed.length === 0) {
+        await sendMessage("No closed positions in history.");
+        return;
+      }
+      const lines = [...closed].reverse().map((p, i) => {
+        const pnlSign = p.pnl_usd >= 0 ? "+" : "";
+        const pnlPctSign = p.pnl_pct >= 0 ? "+" : "";
+        const age = p.minutes_held != null ? `${p.minutes_held}m` : "?m";
+        const feeStr = p.fees_earned_usd != null ? `$${Number(p.fees_earned_usd).toFixed(2)}` : "$--";
+        const pnlStr = `${pnlPctSign}${Number(p.pnl_pct).toFixed(2)}% (${pnlSign}$${Number(p.pnl_usd).toFixed(2)})`;
+        return `${i + 1}. <b>${p.pool_name}</b> | PnL: ${pnlStr} | Fees: ${feeStr} | Held: ${age}\n    └─ Reason: <i>${p.close_reason || "n/a"}</i>`;
+      });
+      await sendHTML(`📜 <b>Latest 10 Closed Positions:</b>\n\n${lines.join("\n\n")}`);
+    } catch (e) {
+      await sendMessage(`Error: ${e.message}`).catch(() => {});
+    }
     return;
   }
 
@@ -1992,4 +2073,35 @@ Focus on: hold duration, entry/exit timing, what win rates look like, whether sc
       log("startup_error", e.message);
     }
   })();
+}
+
+if (isMain) {
+  try {
+    startDashboardServer({
+      runManagementCycle,
+      runScreeningCycle,
+      getStatus: () => ({
+        managementBusy: _managementBusy,
+        screeningBusy: _screeningBusy,
+        cronStarted,
+        timers,
+      }),
+      toggleCron: (action) => {
+        if (action === "pause") {
+          stopCronJobs();
+          cronStarted = false;
+          return "paused";
+        } else if (action === "resume") {
+          cronStarted = true;
+          timers.managementLastRun = Date.now();
+          timers.screeningLastRun = Date.now();
+          startCronJobs();
+          return "resumed";
+        }
+        return cronStarted ? "running" : "idle";
+      }
+    });
+  } catch (err) {
+    log("startup_error", `Failed to start dashboard server: ${err.message}`);
+  }
 }

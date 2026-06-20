@@ -520,3 +520,17 @@ export function syncOpenPositions(active_addresses) {
 
   if (changed) save(state);
 }
+
+/**
+ * Update final PnL for a closed position.
+ */
+export function updateClosedPnL(position_address, pnl_pct, pnl_usd, fees_usd) {
+  const state = load();
+  const pos = state.positions[position_address];
+  if (!pos) return;
+  if (pnl_pct !== null && pnl_pct !== undefined) pos.close_pnl_pct = pnl_pct;
+  if (pnl_usd !== null && pnl_usd !== undefined) pos.close_pnl_usd = pnl_usd;
+  if (fees_usd !== null && fees_usd !== undefined) pos.total_fees_claimed_usd = fees_usd;
+  save(state);
+  log("state", `Position ${position_address} final PnL updated: ${pnl_pct}% ($${pnl_usd}), fees: $${fees_usd}`);
+}

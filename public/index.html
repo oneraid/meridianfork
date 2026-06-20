@@ -1,0 +1,2916 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meridian — Autonomous DLMM LP Agent</title>
+  <meta name="description" content="Meridian autonomous liquidity management agent dashboard for Meteora DLMM pools on Solana.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS & DaisyUI CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            heading: ['Space Grotesk', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    /* ═══════════════════ GLOBAL BASE ═══════════════════ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg-base:       #050510;
+      --bg-surface:    #0b0b1e;
+      --bg-elevated:   #10102a;
+      --bg-hover:      #161636;
+      --border-subtle: rgba(100, 80, 255, 0.10);
+      --border-bright: rgba(130, 100, 255, 0.35);
+      --accent:        #7c5cff;
+      --accent-light:  #a78bfa;
+      --accent-glow:   rgba(124, 92, 255, 0.4);
+      --success:       #10d9a0;
+      --warning:       #f5a623;
+      --danger:        #ff4d6d;
+      --text-primary:  #e8e4ff;
+      --text-secondary:#9b94c6;
+      --text-muted:    #5e5880;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════ RESPONSIVE BREAKPOINTS ═══════════════════ */
+    /* Mobile: < 768px */
+    /* Desktop: >= 768px */
+
+    body {
+      background: var(--bg-base);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(124, 92, 255, 0.14) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 80% 90%, rgba(59, 130, 246, 0.06) 0%, transparent 60%);
+      font-family: 'Inter', sans-serif;
+      color: var(--text-primary);
+    }
+
+    /* ═══════════════════ SCROLLBAR ═══════════════════ */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(124, 92, 255, 0.25); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(124, 92, 255, 0.5); }
+
+    /* ═══════════════════ APP SHELL ═══════════════════ */
+    #app-shell {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════ BOTTOM NAV (MOBILE ONLY) ═══════════════════ */
+    #bottom-nav {
+      display: none; /* hidden on desktop */
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 100;
+      padding: 0 4px;
+      align-items: center;
+      justify-content: space-around;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .bottom-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      min-width: 52px;
+      font-family: inherit;
+    }
+
+    .bottom-nav-item svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .bottom-nav-item:hover {
+      color: var(--text-primary);
+      background: var(--bg-elevated);
+    }
+
+    .bottom-nav-item.active {
+      color: var(--accent-light);
+    }
+
+    .bottom-nav-item.active svg {
+      filter: drop-shadow(0 0 6px rgba(124, 92, 255, 0.6));
+    }
+
+    /* ─── More menu popup ─── */
+    #more-menu {
+      display: none;
+      position: fixed;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-bright);
+      border-radius: 16px;
+      padding: 8px;
+      z-index: 200;
+      min-width: 200px;
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.6);
+    }
+
+    #more-menu.open { display: block; }
+
+    .more-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+      font-family: inherit;
+      text-align: left;
+    }
+    .more-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .more-menu-item.active { color: var(--accent-light); }
+    .more-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    /* ═══════════════════ SIDEBAR ═══════════════════ */
+    #sidebar {
+      width: 240px;
+      min-width: 240px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 20;
+    }
+
+    #sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+
+    .sidebar-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #7c5cff 0%, #3b82f6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(124, 92, 255, 0.4);
+      flex-shrink: 0;
+    }
+
+    .logo-title { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 17px; letter-spacing: 0.08em; color: #fff; }
+    .logo-sub { font-size: 9px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--success); display: flex; align-items: center; gap: 5px; margin-top: 1px; }
+
+    .nav-section { padding: 12px 10px 6px; flex: 1; }
+    .nav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); padding: 4px 10px 8px; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      background: transparent;
+      text-align: left;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-subtle);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(59, 130, 246, 0.12));
+      border-color: rgba(124, 92, 255, 0.4);
+      color: #fff;
+      box-shadow: inset 0 0 12px rgba(124, 92, 255, 0.08), 0 0 0 1px rgba(124, 92, 255, 0.15);
+    }
+
+    .nav-item.active .nav-icon { color: var(--accent-light); }
+    .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; transition: opacity 0.18s; }
+    .nav-item:hover .nav-icon, .nav-item.active .nav-icon { opacity: 1; }
+
+    /* ═══════════════════ WALLET CARD ═══════════════════ */
+    .wallet-card-wrap { padding: 12px 10px; flex-shrink: 0; }
+    .wallet-card {
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(140deg, rgba(124, 92, 255, 0.18) 0%, rgba(16, 12, 48, 0.7) 100%);
+      border: 1px solid rgba(124, 92, 255, 0.25);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 0 16px rgba(124, 92, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+    .wallet-card::after {
+      content: '';
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 100px; height: 100px;
+      background: radial-gradient(circle, rgba(124, 92, 255, 0.15), transparent 70%);
+      pointer-events: none;
+    }
+    .wallet-label { font-size: 9px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(167, 139, 250, 0.7); }
+    .wallet-sol { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 800; color: #fff; line-height: 1.1; margin-top: 4px; }
+    .wallet-usd { font-size: 10px; color: var(--text-secondary); margin-top: 3px; font-family: 'JetBrains Mono', monospace; }
+    .wallet-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(124, 92, 255, 0.15); }
+
+    /* ═══════════════════ SIDEBAR FOOTER ═══════════════════ */
+    .sidebar-footer { padding: 12px 10px; border-top: 1px solid var(--border-subtle); flex-shrink: 0; }
+    .status-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px; font-size: 12px; }
+    .status-label { font-weight: 500; color: var(--text-secondary); }
+
+    /* ═══════════════════ MAIN AREA ═══════════════════ */
+    #main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* ═══════════════════ TOP BAR ═══════════════════ */
+    #top-bar {
+      height: 60px;
+      min-height: 60px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      gap: 16px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+
+    .top-bar-left { display: flex; flex-direction: column; min-width: 0; }
+    .view-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: #fff; line-height: 1; }
+    .view-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+
+    .top-bar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    /* Hide action labels on mobile, keep icons */
+    .topbar-label { display: inline; }
+
+    /* ═══════════════════ CONTENT AREA ═══════════════════ */
+    #content-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px 28px;
+    }
+
+    /* ═══════════════════ MOBILE RESPONSIVE ═══════════════════ */
+    @media (max-width: 767px) {
+      html, body { overflow: auto; height: auto; }
+
+      #app-shell {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+      }
+
+      /* Hide desktop sidebar */
+      #sidebar { display: none !important; }
+
+      /* Show mobile bottom nav */
+      #bottom-nav { display: flex; }
+
+      /* Main area fills full width */
+      #main-area {
+        width: 100%;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+      }
+
+      #top-bar {
+        padding: 0 16px;
+        height: 54px;
+        min-height: 54px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+
+      .view-title { font-size: 15px; }
+      .view-subtitle { display: none; } /* hide countdown on mobile */
+
+      /* Hide text labels in top bar buttons, keep compact */
+      .topbar-label { display: none; }
+      .top-bar-actions { gap: 4px; }
+      .btn-ghost.btn-sm, .btn-danger.btn-sm { padding: 5px 8px; font-size: 11px; }
+
+      #content-area {
+        flex: none;
+        height: auto;
+        overflow: visible;
+        padding: 16px;
+        /* Bottom padding for the fixed bottom nav */
+        padding-bottom: 80px;
+      }
+
+      /* Responsive metric grid: 2 columns on mobile */
+      .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+
+      /* Dashboard split: single column */
+      .dashboard-split { grid-template-columns: 1fr !important; }
+
+      /* Positions grid: single column */
+      .positions-grid { grid-template-columns: 1fr !important; }
+
+      /* Config grid: single column */
+      #config-form { grid-template-columns: 1fr !important; }
+
+      /* Lessons/Perf grid: single column */
+      .lessons-grid { grid-template-columns: 1fr !important; }
+
+      /* Perf stat cards: single row */
+      .perf-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; }
+
+      /* Make tables horizontally scrollable */
+      .panel { overflow-x: auto; }
+      .data-table { min-width: 560px; }
+
+      /* Metric card smaller */
+      .metric-card { padding: 14px; }
+      .metric-value { font-size: 20px !important; }
+
+      /* Section headers compact */
+      .section-header { margin-bottom: 12px; }
+
+      /* More overlay backdrop */
+      #more-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 150;
+      }
+      #more-backdrop.open { display: block; }
+    }
+
+    @media (min-width: 768px) and (max-width: 1023px) {
+      /* Tablet: keep sidebar but narrower, 2-col grids */
+      #sidebar { width: 200px; min-width: 200px; }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .dashboard-split { grid-template-columns: 1fr !important; }
+      #content-area { padding: 18px 20px; }
+    }
+
+    /* ═══════════════════ GLASS PANELS ═══════════════════ */
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+    }
+
+    .panel-glow {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(124, 92, 255, 0.05);
+    }
+
+    /* ═══════════════════ METRIC CARDS ═══════════════════ */
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .metric-card:hover { border-color: var(--border-bright); box-shadow: 0 0 20px rgba(124, 92, 255, 0.08); }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 16px 16px 0 0;
+    }
+    .metric-card.accent-purple::before { background: linear-gradient(90deg, #7c5cff, #a78bfa); }
+    .metric-card.accent-blue::before   { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .metric-card.accent-green::before  { background: linear-gradient(90deg, #10d9a0, #34d399); }
+    .metric-card.accent-cyan::before   { background: linear-gradient(90deg, #06b6d4, #67e8f9); }
+    .metric-card.accent-rose::before   { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+    .metric-card.accent-amber::before  { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+    .metric-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
+    .metric-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+    .metric-value { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 800; color: #fff; line-height: 1; margin-top: 12px; }
+    .metric-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+
+    /* ═══════════════════ BUTTONS ═══════════════════ */
+    .btn-primary {
+      background: linear-gradient(135deg, #7c5cff 0%, #5b3fcc 100%);
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s;
+      box-shadow: 0 2px 12px rgba(124, 92, 255, 0.3);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #8f6fff, #6b4ee0); box-shadow: 0 4px 20px rgba(124, 92, 255, 0.45); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn-ghost:hover { background: var(--bg-elevated); border-color: var(--border-bright); color: var(--text-primary); }
+
+    .btn-danger {
+      background: linear-gradient(135deg, rgba(255, 77, 109, 0.2), rgba(180, 30, 60, 0.3));
+      color: #ff6b8a;
+      border: 1px solid rgba(255, 77, 109, 0.35);
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+    }
+    .btn-danger:hover { background: linear-gradient(135deg, rgba(255, 77, 109, 0.35), rgba(180, 30, 60, 0.5)); border-color: rgba(255, 77, 109, 0.6); color: #ff8fa8; }
+
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 7px; }
+
+    /* ═══════════════════ STATUS BADGES ═══════════════════ */
+    .badge-in-range { background: rgba(16, 217, 160, 0.1); color: var(--success); border: 1px solid rgba(16, 217, 160, 0.25); padding: 3px 10px; border-radius: 99px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 5px; }
+    .badge-oor { background: rgba(245, 166, 35, 0.1); color: var(--warning); border: 1px solid rgba(245, 166, 35, 0.25); padding: 3px 10px; border-radius: 99px; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ═══════════════════ TABLES ═══════════════════ */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      padding: 10px 16px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: left;
+      background: rgba(11, 11, 30, 0.8);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .data-table td {
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid rgba(100, 80, 255, 0.05);
+      vertical-align: middle;
+    }
+    .data-table tr:hover td { background: rgba(124, 92, 255, 0.04); }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* ═══════════════════ POSITION CARD (DASHBOARD GRID) ═══════════════════ */
+    .pos-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    }
+    .pos-card:hover { border-color: var(--border-bright); box-shadow: 0 4px 24px rgba(0,0,0,0.35); transform: translateY(-2px); }
+
+    /* ═══════════════════ RANGE BAR ═══════════════════ */
+    .range-track { width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 99px; position: relative; }
+    .range-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+    .range-fill.in { background: linear-gradient(90deg, #7c5cff, #10d9a0); }
+    .range-fill.out { background: linear-gradient(90deg, #7c5cff, #f5a623); }
+    .range-dot {
+      position: absolute;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      top: 50%; transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      box-shadow: 0 0 8px currentColor;
+      transition: left 0.4s ease;
+    }
+    .range-dot.in { background: var(--success); color: var(--success); }
+    .range-dot.out { background: var(--warning); color: var(--warning); }
+
+    /* ═══════════════════ DECISION FEED ITEMS ═══════════════════ */
+    .feed-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid rgba(100, 80, 255, 0.07);
+      transition: border-color 0.18s;
+    }
+    .feed-item:hover { border-color: var(--border-bright); }
+
+    /* ═══════════════════ FORM ELEMENTS ═══════════════════ */
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .form-input {
+      background: var(--bg-base);
+      border: 1px solid rgba(100, 80, 255, 0.18);
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-size: 13px;
+      color: var(--text-primary);
+      font-family: inherit;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      width: 100%;
+    }
+    .form-input:focus { outline: none; border-color: rgba(124, 92, 255, 0.55); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.12); }
+    .form-input::placeholder { color: var(--text-muted); }
+    select.form-input option { background: var(--bg-elevated); }
+
+    /* ═══════════════════ CONFIG SECTION ═══════════════════ */
+    .cfg-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .cfg-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    /* ═══════════════════ MODALS ═══════════════════ */
+    dialog.meridian-modal {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-bright);
+      border-radius: 18px;
+      padding: 0;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(124, 92, 255, 0.1);
+      max-width: 440px;
+      width: 100%;
+      color: var(--text-primary);
+    }
+    dialog.meridian-modal::backdrop {
+      background: rgba(5, 5, 16, 0.8);
+      backdrop-filter: blur(6px);
+    }
+    .modal-header { padding: 24px 24px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; }
+    .modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; }
+    .modal-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer { padding: 0 24px 20px; display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* ═══════════════════ TOAST ═══════════════════ */
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast-item {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: slideInRight 0.25s ease;
+      max-width: 340px;
+    }
+    .toast-item.success { border-color: rgba(16, 217, 160, 0.3); color: var(--success); }
+    .toast-item.error   { border-color: rgba(255, 77, 109, 0.3); color: #ff6b8a; }
+    .toast-item.info    { border-color: rgba(124, 92, 255, 0.3); color: var(--accent-light); }
+
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    /* ═══════════════════ PULSE ANIMATIONS ═══════════════════ */
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes ping   { 75%,100% { transform: scale(2); opacity: 0; } }
+    .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    .ping-dot  { animation: ping  1.2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+    /* ═══════════════════ LOGIN PAGE ═══════════════════ */
+    #login-page {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: var(--bg-base);
+      background-image: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(124, 92, 255, 0.18), transparent 70%);
+      z-index: 1000;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 24px;
+      padding: 36px;
+      box-shadow: 0 32px 96px rgba(0,0,0,0.8), 0 0 0 1px rgba(124, 92, 255, 0.15), 0 0 60px rgba(124, 92, 255, 0.08);
+    }
+
+    /* ═══════════════════ LESSONS CARDS ═══════════════════ */
+    .lesson-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 16px;
+      transition: border-color 0.18s;
+    }
+    .lesson-card:hover { border-color: var(--border-bright); }
+
+    /* ═══════════════════ SECTION HEADERS ═══════════════════ */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════ CHECKBOX ═══════════════════ */
+    .form-checkbox {
+      width: 16px; height: 16px;
+      border-radius: 5px;
+      border: 1.5px solid rgba(124, 92, 255, 0.4);
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════ LOGIN PAGE ════════════════ -->
+  <div id="login-page">
+    <div class="login-card">
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px;">
+        <div class="logo-icon" style="width:52px;height:52px;border-radius:16px;margin-bottom:16px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918"/>
+          </svg>
+        </div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;background:linear-gradient(135deg,#fff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:0.04em;">MERIDIAN</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;text-align:center;">Autonomous DLMM Liquidity Agent</div>
+      </div>
+
+      <form id="login-form" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="form-group">
+          <label class="form-label">Dashboard Password</label>
+          <input type="password" id="password-input" class="form-input" placeholder="Enter your access key" required style="font-size:15px;padding:12px 14px;letter-spacing:0.1em;">
+        </div>
+
+        <div id="login-error" style="display:none;font-size:12px;color:#ff6b8a;background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);border-radius:8px;padding:10px 12px;font-weight:500;">
+          Invalid credentials. Please check your password.
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;margin-top:4px;">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Unlock Console
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════ MAIN APP SHELL ════════════════ -->
+  <div id="app-shell" style="display:none;">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-title">MERIDIAN</div>
+          <div class="logo-sub">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--success);" class="pulse-dot"></span>
+            SYSTEM ACTIVE
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="nav-section">
+        <div class="nav-label">Navigation</div>
+        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="nav-item active">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"/></svg>
+          Overview
+        </button>
+        <button onclick="switchTab('positions')" id="tab-btn-positions" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          LP Positions
+        </button>
+        <button onclick="switchTab('decisions')" id="tab-btn-decisions" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Decisions & Logs
+        </button>
+        <button onclick="switchTab('lessons')" id="tab-btn-lessons" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          Lessons & Performance
+        </button>
+        <button onclick="switchTab('config')" id="tab-btn-config" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Configuration
+        </button>
+      </nav>
+
+      <!-- Wallet Card -->
+      <div class="wallet-card-wrap">
+        <div class="wallet-card">
+          <div class="wallet-label">Solana Wallet</div>
+          <div class="wallet-sol"><span id="sidebar-wallet-sol">--</span> <span style="font-size:11px;font-weight:600;color:var(--accent-light);">SOL</span></div>
+          <div class="wallet-usd" id="sidebar-wallet-usd">Loading...</div>
+          <div class="wallet-footer">
+            <span style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono';letter-spacing:0.05em;">ACTIVE NODE</span>
+            <svg style="width:18px;height:18px;color:rgba(124,92,255,0.5);" viewBox="0 0 397 311" fill="currentColor">
+              <path d="M64.6 237.9c-2.4-2.4-5.7-3.8-9.2-3.8H9.2c-5.1 0-9.2 4.1-9.2 9.2v53.9c0 5.1 4.1 9.2 9.2 9.2h323.8c3.5 0 6.8-1.4 9.2-3.8l51-51c2.4-2.4 3.8-5.7 3.8-9.2v-53.9c0-5.1-4.1-9.2-9.2-9.2H73.8c-3.5 0-6.8 1.4-9.2 3.8l-51 51z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span class="status-label">Cron Tasks</span>
+          <span id="cron-status-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,217,160,0.12);color:var(--success);border:1px solid rgba(16,217,160,0.25);">ON</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Relay Server</span>
+          <span id="relay-status-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(100,80,255,0.07);color:var(--text-muted);border:1px solid var(--border-subtle);">OFF</span>
+        </div>
+        <div style="margin-top:10px;">
+          <button onclick="handleLogout()" class="btn-ghost" style="width:100%;justify-content:center;font-size:12px;color:#ff6b8a;border-color:rgba(255,77,109,0.2);">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            Lock Console
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div id="main-area">
+
+      <!-- TOP BAR -->
+      <header id="top-bar">
+        <div class="top-bar-left">
+          <div class="view-title" id="view-title">Overview</div>
+          <div class="view-subtitle">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.8;" class="ping-dot"></span>
+            <span id="countdown-text">Loading agent timers...</span>
+          </div>
+        </div>
+        <div class="top-bar-actions">
+          <button onclick="triggerQuickAction('screen')" class="btn-ghost btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="topbar-label">Run Screening</span>
+          </button>
+          <button onclick="triggerQuickAction('manage')" class="btn-ghost btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span class="topbar-label">Run Management</span>
+          </button>
+          <button onclick="toggleCronState()" id="btn-toggle-cron" class="btn-danger btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="topbar-label">Pause Agent</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTENT -->
+      <div id="content-area">
+
+        <!-- ── TAB: DASHBOARD OVERVIEW ── -->
+        <div id="view-dashboard">
+
+          <!-- Metric Cards -->
+          <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-bottom:24px;">
+            <div class="metric-card accent-purple">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Wallet Balance</span>
+                <div class="metric-icon" style="background:rgba(124,92,255,0.12);color:var(--accent-light);">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-wallet-sol">--</span></div>
+              <div class="metric-sub" id="metric-wallet-usd">SOL — calculating USD...</div>
+            </div>
+            <div class="metric-card accent-blue">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Active Positions</span>
+                <div class="metric-icon" style="background:rgba(59,130,246,0.12);color:#60a5fa;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-positions-count">--</span> <span id="metric-positions-max" style="font-size:14px;color:var(--text-secondary);font-weight:500;">/ --</span></div>
+              <div class="metric-sub">Open liquidity slots</div>
+            </div>
+            <div class="metric-card accent-green">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Total Fees Earned</span>
+                <div class="metric-icon" style="background:rgba(16,217,160,0.12);color:var(--success);">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-fees-claimed">--</span></div>
+              <div class="metric-sub">USD fees accumulated</div>
+            </div>
+            <div class="metric-card accent-cyan">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Net Portfolio Value</span>
+                <div class="metric-icon" style="background:rgba(6,182,212,0.12);color:#67e8f9;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-total-value">--</span></div>
+              <div class="metric-sub">Combined assets USD</div>
+            </div>
+            <div class="metric-card accent-rose">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Winrate (W / L)</span>
+                <div class="metric-icon" style="background:rgba(244,63,94,0.12);color:#fb7185;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-winrate-pct">--</span></div>
+              <div class="metric-sub" id="metric-winrate-count">W: -- / L: --</div>
+            </div>
+            <div class="metric-card accent-amber">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">System Connection</span>
+                <div class="metric-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value" style="font-size:11px;margin-top:14px;display:flex;flex-direction:column;gap:5px;font-family:'Space Grotesk',sans-serif;font-weight:600;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">Solana RPC</span>
+                  <span id="status-rpc">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">Helius API</span>
+                  <span id="status-helius">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">TG Bot</span>
+                  <span id="status-telegram">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">LLM API</span>
+                  <span id="status-llm">--</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Split Grid -->
+          <div class="dashboard-split" style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+            <!-- Open Positions -->
+            <div>
+              <div class="section-header">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Open LP Positions
+                </div>
+                <button onclick="switchTab('positions')" style="font-size:12px;color:var(--accent-light);font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                  View All
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+              <div id="dashboard-positions-list" class="positions-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;"></div>
+            </div>
+
+            <!-- Recent Action Feed -->
+            <div>
+              <div class="section-header">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Recent Actions
+                </div>
+                <button onclick="switchTab('decisions')" style="font-size:12px;color:var(--accent-light);font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                  Full Log
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+              <div id="dashboard-decisions-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: LP POSITIONS ── -->
+        <div id="view-positions" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">
+              <div class="section-dot"></div>
+              Managed Liquidity Positions
+            </div>
+            <span id="positions-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(124,92,255,0.1);color:var(--accent-light);border:1px solid rgba(124,92,255,0.25);">-- Positions</span>
+          </div>
+          <div class="panel" style="overflow:hidden;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pair / Address</th>
+                  <th>Value</th>
+                  <th>PnL</th>
+                  <th>Unclaimed Fees</th>
+                  <th>Yield (24h)</th>
+                  <th>Price Range (SOL)</th>
+                  <th>Bins</th>
+                  <th>Age</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="positions-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Closed Positions History -->
+          <div class="section-header" style="margin-top: 32px;">
+            <div class="section-title">
+              <div class="section-dot" style="background: var(--text-muted);"></div>
+              Closed Positions History
+            </div>
+            <span id="positions-history-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">-- Closed</span>
+          </div>
+          <div class="panel" style="overflow:hidden; margin-bottom: 32px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pair / Address</th>
+                  <th>Initial SOL</th>
+                  <th>Closed PnL</th>
+                  <th>Total Fees</th>
+                  <th>Timeline / Duration</th>
+                  <th>Close Reason</th>
+                </tr>
+              </thead>
+              <tbody id="positions-history-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── TAB: DECISIONS LOG ── -->
+        <div id="view-decisions" style="display:none;">
+          <!-- Screened Candidate Pools -->
+          <div class="section-header">
+            <div>
+              <div class="section-title" style="margin-bottom:4px;">
+                <div class="section-dot"></div>
+                Screened Candidate Pools
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);">Top-scoring Meteora DLMM pools matching configuration filters</div>
+            </div>
+            <button onclick="triggerScreening()" id="btn-trigger-screen" class="btn-primary btn-sm">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh Candidates
+            </button>
+          </div>
+          <div class="panel" style="overflow:hidden; margin-bottom:32px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pool Details</th>
+                  <th>Fee / Active TVL</th>
+                  <th>Volume / TVL</th>
+                  <th>Organic Score</th>
+                  <th>Volatility</th>
+                  <th>Deploy</th>
+                </tr>
+              </thead>
+              <tbody id="screener-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Agent Decision Log -->
+          <div class="section-header" style="margin-bottom:16px;">
+            <div>
+              <div class="section-title" style="margin-bottom:4px;">
+                <div class="section-dot"></div>
+                Agent Decision Log
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);">Structured audit trail of all agent operations</div>
+            </div>
+          </div>
+          <div class="panel" style="overflow:hidden; margin-bottom:32px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action Type</th>
+                  <th>Summary</th>
+                  <th>Decision / Reason</th>
+                </tr>
+              </thead>
+              <tbody id="decisions-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── TAB: LESSONS & PERFORMANCE ── -->
+        <div id="view-lessons" style="display:none;">
+
+          <!-- Perf Summary Cards -->
+          <div class="perf-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+            <div class="metric-card accent-purple">
+              <div class="metric-label">Closed Positions</div>
+              <div class="metric-value" id="perf-closed-count">--</div>
+            </div>
+            <div class="metric-card accent-green">
+              <div class="metric-label">Win Rate</div>
+              <div class="metric-value" id="perf-win-rate">--</div>
+            </div>
+            <div class="metric-card accent-blue">
+              <div class="metric-label">Avg Closed PnL</div>
+              <div class="metric-value" id="perf-avg-pnl">--</div>
+            </div>
+          </div>
+
+          <div class="lessons-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <!-- Lessons -->
+            <div>
+              <div class="section-header" style="margin-bottom:14px;">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Lessons Learned
+                </div>
+                <button onclick="document.getElementById('add-lesson-modal').showModal()" class="btn-primary btn-xs">Add Lesson</button>
+              </div>
+              <div id="lessons-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+            </div>
+            <!-- Performance table -->
+            <div>
+              <div class="section-title" style="margin-bottom:14px;">
+                <div class="section-dot"></div>
+                Closed Positions Performance
+              </div>
+              <div class="panel" style="overflow:hidden;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Pool</th>
+                      <th>Hold Time</th>
+                      <th>Close Reason</th>
+                      <th>PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lessons-perf-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: CONFIGURATION ── -->
+        <div id="view-config" style="display:none;">
+          <div class="section-header" style="margin-bottom:20px;">
+            <div class="section-title">
+              <div class="section-dot"></div>
+              Configuration Panel
+            </div>
+            <button onclick="saveConfiguration()" class="btn-primary btn-sm">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              Save Settings
+            </button>
+          </div>
+
+          <form id="config-form" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <!-- Risk & Capital -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                Risk & Capital Allocation
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div class="form-group">
+                  <label class="form-label">Base SOL per Position</label>
+                  <input type="number" step="0.05" id="cfg-deployAmountSol" class="form-input">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min SOL to Open</label>
+                    <input type="number" step="0.05" id="cfg-minSolToOpen" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Gas Reserve (SOL)</label>
+                    <input type="number" step="0.01" id="cfg-gasReserve" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Max Open Positions</label>
+                    <input type="number" step="1" id="cfg-maxPositions" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max SOL Cap per Position</label>
+                    <input type="number" step="1" id="cfg-maxDeployAmount" class="form-input">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+                  <input type="checkbox" id="cfg-solMode" class="form-checkbox">
+                  <label for="cfg-solMode" class="form-label" style="cursor:pointer;margin:0;">SOL Mode Display</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Exit Rules -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                Exit Rules & Trailing Take Profit
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Take Profit (%)</label>
+                    <input type="number" step="0.5" id="cfg-takeProfitPct" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Stop Loss (%)</label>
+                    <input type="number" step="0.5" id="cfg-stopLossPct" class="form-input">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
+                  <input type="checkbox" id="cfg-trailingTakeProfit" class="form-checkbox">
+                  <label for="cfg-trailingTakeProfit" class="form-label" style="cursor:pointer;margin:0;">Enable Trailing Take Profit</label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Trailing Trigger (%)</label>
+                    <input type="number" step="0.1" id="cfg-trailingTriggerPct" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Trailing Drop (%)</label>
+                    <input type="number" step="0.1" id="cfg-trailingDropPct" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">OOR Bin Limit</label>
+                    <input type="number" step="1" id="cfg-outOfRangeBinsToClose" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">OOR Wait Minutes</label>
+                    <input type="number" step="1" id="cfg-outOfRangeWaitMinutes" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Yield / TVL 24h (%)</label>
+                    <input type="number" step="1" id="cfg-minFeePerTvl24h" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Yield Check Cooldown (min)</label>
+                    <input type="number" step="1" id="cfg-minAgeBeforeYieldCheck" class="form-input">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Screener Criteria -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                Screener Criteria
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Candle Timeframe</label>
+                    <select id="cfg-timeframe" class="form-input">
+                      <option value="5m">5m</option>
+                      <option value="30m">30m</option>
+                      <option value="1h">1h</option>
+                      <option value="2h">2h</option>
+                      <option value="4h">4h</option>
+                      <option value="24h">24h</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Min 24h Volume (USD)</label>
+                    <input type="number" step="100" id="cfg-minVolume" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min TVL (USD)</label>
+                    <input type="number" step="5000" id="cfg-minTvl" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max TVL (USD)</label>
+                    <input type="number" step="5000" id="cfg-maxTvl" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Mcap (USD)</label>
+                    <input type="number" step="5000" id="cfg-minMcap" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Mcap (USD)</label>
+                    <input type="number" step="5000" id="cfg-maxMcap" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Organic Score</label>
+                    <input type="number" step="1" id="cfg-minOrganic" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Min Token Holders</label>
+                    <input type="number" step="50" id="cfg-minHolders" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Bin Step</label>
+                    <input type="number" step="1" id="cfg-minBinStep" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Bin Step</label>
+                    <input type="number" step="1" id="cfg-maxBinStep" class="form-input">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Min fee/active-TVL ratio (%)</label>
+                  <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Bins Below</label>
+                    <input type="number" step="1" id="cfg-minBinsBelow" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Bins Below</label>
+                    <input type="number" step="1" id="cfg-maxBinsBelow" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Default Bins</label>
+                    <input type="number" step="1" id="cfg-defaultBinsBelow" class="form-input">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Schedule & LLM -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                Schedule Intervals & LLM Models
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Management Cycle (min)</label>
+                    <input type="number" step="1" id="cfg-managementIntervalMin" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Screening Cycle (min)</label>
+                    <input type="number" step="1" id="cfg-screeningIntervalMin" class="form-input">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Screening LLM Model</label>
+                  <input type="text" id="cfg-screeningModel" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Management LLM Model</label>
+                  <input type="text" id="cfg-managementModel" class="form-input">
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+      </div><!-- /content-area -->
+    </div><!-- /main-area -->
+  </div><!-- /app-shell -->
+
+  <!-- ════════════════ MOBILE BOTTOM NAV ════════════════ -->
+  <!-- Backdrop to close "more" menu -->
+  <div id="more-backdrop" onclick="closeMoreMenu()"></div>
+
+  <!-- More popup menu (lessons, config, logout) -->
+  <div id="more-menu">
+    <button class="more-menu-item" id="more-btn-lessons" onclick="moreNav('lessons')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      Lessons & Performance
+    </button>
+    <button class="more-menu-item" id="more-btn-config" onclick="moreNav('config')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Configuration
+    </button>
+    <div style="height:1px;background:var(--border-subtle);margin:6px 8px;"></div>
+    <button class="more-menu-item" onclick="handleLogout();closeMoreMenu();" style="color:#ff6b8a;">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Lock Console
+    </button>
+  </div>
+
+  <!-- Bottom Nav Bar -->
+  <nav id="bottom-nav">
+    <button class="bottom-nav-item active" id="bnav-dashboard" onclick="switchTab('dashboard');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"/></svg>
+      Home
+    </button>
+    <button class="bottom-nav-item" id="bnav-positions" onclick="switchTab('positions');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      Positions
+    </button>
+    <button class="bottom-nav-item" id="bnav-decisions" onclick="switchTab('decisions');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Logs
+    </button>
+    <button class="bottom-nav-item" id="bnav-more" onclick="toggleMoreMenu()">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+      More
+    </button>
+  </nav>
+
+
+  <!-- Hidden icon templates -->
+  <div style="display:none;">
+    <div id="tmpl-icon-deploy"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(16,217,160,0.15);flex-shrink:0;">🚀</span></div>
+    <div id="tmpl-icon-close"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(255,77,109,0.15);flex-shrink:0;">💥</span></div>
+    <div id="tmpl-icon-skip"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(100,80,255,0.1);flex-shrink:0;">🛡️</span></div>
+  </div>
+
+  <!-- Deploy Modal -->
+  <dialog id="deploy-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Deploy LP Position</div>
+      <div class="modal-subtitle">Allocate liquidity manually into the chosen Meteora pool.</div>
+    </div>
+    <form id="deploy-form">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <input type="hidden" id="deploy-pool-address">
+        <div class="form-group">
+          <label class="form-label">Pool Name</label>
+          <input type="text" id="deploy-pool-name" class="form-input" readonly style="opacity:0.6;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">LP Deposit Size (SOL)</label>
+          <input type="number" step="0.05" id="deploy-amount" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bins Below Active Bin</label>
+          <input type="number" step="1" id="deploy-bins-below" class="form-input" required>
+        </div>
+        <div id="deploy-error" style="display:none;font-size:12px;color:#ff6b8a;background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);border-radius:8px;padding:10px 12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('deploy-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" id="btn-submit-deploy" class="btn-primary">Deploy Position</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Position Note Modal -->
+  <dialog id="position-note-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Set Custom Position Instruction</div>
+      <div class="modal-subtitle">Inject a condition the management cycle will act upon autonomously.</div>
+    </div>
+    <form id="position-note-form">
+      <div class="modal-body">
+        <input type="hidden" id="note-position-address">
+        <div class="form-group">
+          <label class="form-label">Instruction Note</label>
+          <textarea id="note-text" class="form-input" style="height:96px;resize:vertical;" placeholder="e.g. Sell if token hits $1.50 or if fees earned reach 2%"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('position-note-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save Instruction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Add Lesson Modal -->
+  <dialog id="add-lesson-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Manual Agent Lesson</div>
+      <div class="modal-subtitle">Manually record a lesson. Injected into prompt contexts for screener and manager.</div>
+    </div>
+    <form id="add-lesson-form">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label class="form-label">Lesson / Rule Text</label>
+          <textarea id="lesson-rule-text" class="form-input" style="height:96px;resize:vertical;" placeholder="e.g. Avoid deploying into token pairs that have less than $5,000 all-time volume" required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags (comma-separated)</label>
+          <input type="text" id="lesson-tags" class="form-input" placeholder="screener, risk, pumpfun">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('add-lesson-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save Lesson</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Close Confirm Modal -->
+  <dialog id="close-confirm-modal" class="meridian-modal">
+    <div class="modal-header" style="border-color:rgba(255,77,109,0.2);">
+      <div class="modal-title" style="color:#ff6b8a;">Close LP Position</div>
+      <div class="modal-subtitle">This will trigger on-chain withdrawal and swap assets back to SOL.</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-secondary);background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.15);border-radius:10px;padding:14px 16px;line-height:1.6;">
+        Are you sure you want to <strong style="color:var(--text-primary);">CLOSE</strong> the position in
+        <strong style="color:#fff;" id="close-confirm-pair"></strong>?
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="document.getElementById('close-confirm-modal').close()" class="btn-ghost">Cancel</button>
+      <button type="button" id="btn-confirm-close" class="btn-danger">Yes, Close Position</button>
+    </div>
+  </dialog>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- ════════════════ CLIENT LOGIC ════════════════ -->
+  <script>
+    let csrfToken = "";
+    let statusInterval = null;
+    let positionsInterval = null;
+    let dashboardState = {
+      status: {},
+      positions: [],
+      candidates: [],
+      decisions: [],
+      lessons: {},
+      config: {}
+    };
+    let closePositionPendingAddr = "";
+    let closePositionPendingPair = "";
+
+    // Safe text helper (XSS prevention)
+    function safeText(el, text) {
+      if (typeof el === 'string') el = document.getElementById(el);
+      if (el) el.textContent = (text !== undefined && text !== null) ? text : "";
+    }
+
+    function updateApiStatusEl(id, statusObj) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!statusObj) {
+        el.innerHTML = `<span style="color:var(--text-muted);font-size:10px;">UNKNOWN</span>`;
+        return;
+      }
+      if (statusObj.connected) {
+        el.innerHTML = `<span style="color:var(--success);font-weight:700;font-size:10px;">✓ OK</span>`;
+        el.title = statusObj.detail || "";
+      } else {
+        el.innerHTML = `<span style="color:var(--danger);font-weight:700;font-size:10px;" title="${statusObj.detail || ""}">✗ ERR</span>`;
+      }
+    }
+
+    // Toast notifications
+    function showToast(message, type = "success") {
+      const toast = document.createElement("div");
+      toast.className = `toast-item ${type}`;
+
+      const icons = {
+        success: "✓",
+        error: "✕",
+        info: "ℹ"
+      };
+      const iconEl = document.createElement("span");
+      iconEl.textContent = icons[type] || "ℹ";
+      iconEl.style.cssText = "font-weight:900;font-size:14px;flex-shrink:0;";
+
+      const msgEl = document.createElement("span");
+      msgEl.textContent = message;
+
+      toast.appendChild(iconEl);
+      toast.appendChild(msgEl);
+      document.getElementById("toast-container").appendChild(toast);
+
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    // Tab switching
+    function switchTab(tabId) {
+      const tabs = ["dashboard", "positions", "decisions", "lessons", "config"];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const view = document.getElementById(`view-${t}`);
+        if (t === tabId) {
+          btn.classList.add("active");
+          view.style.display = "";
+        } else {
+          btn.classList.remove("active");
+          view.style.display = "none";
+        }
+      });
+
+      const titles = {
+        dashboard: "Overview",
+        positions: "LP Positions",
+        decisions: "Decisions & Logs",
+        lessons: "Lessons & Performance",
+        config: "Configuration Settings"
+      };
+      safeText("view-title", titles[tabId]);
+
+      if (tabId === "decisions") {
+        loadDecisions();
+        loadCandidates();
+      }
+      if (tabId === "lessons") loadLessons();
+      if (tabId === "config") loadConfig();
+    }
+
+    // Login
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pass = document.getElementById("password-input").value;
+      const errEl = document.getElementById("login-error");
+      errEl.style.display = "none";
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pass })
+        });
+        if (!res.ok) throw new Error("invalid");
+        const data = await res.json();
+
+        csrfToken = data.csrfToken;
+        document.getElementById("login-page").style.display = "none";
+        document.getElementById("app-shell").style.display = "flex";
+
+        showToast("Access granted. Terminal unlocked.");
+        startPolling();
+        switchTab("dashboard");
+      } catch {
+        errEl.style.display = "block";
+      }
+    });
+
+    // Logout
+    async function handleLogout() {
+      await fetch("/api/auth/logout", { method: "POST" });
+      clearInterval(statusInterval);
+      clearInterval(positionsInterval);
+      csrfToken = "";
+      document.getElementById("app-shell").style.display = "none";
+      document.getElementById("login-page").style.display = "flex";
+      document.getElementById("password-input").value = "";
+    }
+
+    // Check session on load
+    async function checkSession() {
+      try {
+        const res = await fetch("/api/status");
+        if (res.status === 401) throw new Error("Unauthorized");
+        const data = await res.json();
+        csrfToken = data.csrfToken;
+        document.getElementById("login-page").style.display = "none";
+        document.getElementById("app-shell").style.display = "flex";
+        startPolling();
+        switchTab("dashboard");
+      } catch (err) {
+        document.getElementById("app-shell").style.display = "none";
+        document.getElementById("login-page").style.display = "flex";
+      }
+    }
+
+    // Polling
+    function startPolling() {
+      loadStatus();
+      loadPositions();
+      statusInterval = setInterval(loadStatus, 10000);
+      positionsInterval = setInterval(loadPositions, 10000);
+    }
+
+    // Load status
+    async function loadStatus() {
+      try {
+        const res = await fetch("/api/status");
+        if (res.status === 401) return handleLogout();
+        const data = await res.json();
+        dashboardState.status = data;
+
+        const solValue = Number(data.wallet.sol).toFixed(3);
+        const usdValue = `$${Number(data.wallet.sol_usd).toFixed(2)}`;
+
+        safeText("metric-wallet-sol", `${solValue} SOL`);
+        safeText("metric-wallet-usd", `${usdValue} USD — SOL @ $${data.wallet.sol_price}`);
+        safeText("sidebar-wallet-sol", solValue);
+        safeText("sidebar-wallet-usd", `${usdValue} USD`);
+
+        // Cron status
+        const cronBadge = document.getElementById("cron-status-badge");
+        const btnToggleCron = document.getElementById("btn-toggle-cron");
+        if (data.cronStarted) {
+          cronBadge.textContent = "ON";
+          cronBadge.style.cssText = "font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,217,160,0.12);color:var(--success);border:1px solid rgba(16,217,160,0.25);";
+          btnToggleCron.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Pause Agent`;
+          btnToggleCron.className = "btn-danger btn-sm";
+        } else {
+          cronBadge.textContent = "OFF";
+          cronBadge.style.cssText = "font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(245,166,35,0.1);color:var(--warning);border:1px solid rgba(245,166,35,0.25);";
+          btnToggleCron.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Resume Agent`;
+          btnToggleCron.className = "btn-ghost btn-sm";
+          btnToggleCron.style.color = "var(--success)";
+          btnToggleCron.style.borderColor = "rgba(16,217,160,0.3)";
+        }
+
+        // Countdown
+        const nextMgmt   = data.timers?.managementLastRun  ? Math.max(0, Math.ceil(data.timers.managementIntervalMin || 10) - (Date.now() - data.timers.managementLastRun) / 60000) : null;
+        const nextScreen = data.timers?.screeningLastRun   ? Math.max(0, Math.ceil(data.timers.screeningIntervalMin || 30) - (Date.now() - data.timers.screeningLastRun) / 60000)  : null;
+        let countdownStr = "Autonomous cycles: ";
+        if (nextMgmt !== null)   countdownStr += `manage in ${nextMgmt.toFixed(1)}m`;
+        if (nextMgmt !== null && nextScreen !== null) countdownStr += " · ";
+        if (nextScreen !== null) countdownStr += `screen in ${nextScreen.toFixed(1)}m`;
+        safeText("countdown-text", countdownStr || "No cycle data yet");
+
+        // Update winrate
+        if (data.winrate) {
+          const wins = data.winrate.wins || 0;
+          const losses = data.winrate.losses || 0;
+          const total = wins + losses;
+          const winratePct = total > 0 ? ((wins / total) * 100).toFixed(1) : "0.0";
+          safeText("metric-winrate-pct", `${winratePct}%`);
+          safeText("metric-winrate-count", `W: ${wins} / L: ${losses}`);
+        }
+
+        // Update API statuses
+        if (data.apiStatus) {
+          updateApiStatusEl("status-rpc", data.apiStatus.rpc);
+          updateApiStatusEl("status-helius", data.apiStatus.helius);
+          updateApiStatusEl("status-telegram", data.apiStatus.telegram);
+          updateApiStatusEl("status-llm", data.apiStatus.llm);
+        }
+
+      } catch (e) {
+        console.error("Failed to load status", e);
+      }
+    }
+
+    // Load positions
+    async function loadPositions() {
+      try {
+        const res = await fetch("/api/positions");
+        if (res.status === 401) return handleLogout();
+        const data = await res.json();
+        dashboardState.positions = data.positions || [];
+
+        safeText("metric-positions-count", data.total_positions);
+        safeText("metric-positions-max", `/ ${dashboardState.status.maxPositions || "--"}`);
+        safeText("positions-total-badge", `${data.total_positions} Positions`);
+
+        const totalFees  = data.positions.reduce((acc, p) => acc + (Number(p.total_fees_claimed_usd) || 0) + (Number(p.unclaimed_fees_usd) || 0), 0);
+        const totalValue = data.positions.reduce((acc, p) => acc + (Number(p.total_value_usd) || 0), 0);
+
+        safeText("metric-fees-claimed", `$${totalFees.toFixed(2)}`);
+        safeText("metric-total-value", `$${totalValue.toFixed(2)}`);
+
+        renderPositionsTable();
+        renderDashboardPositionsGrid();
+        loadPositionsHistory();
+      } catch (e) {
+        console.error("Failed to load positions", e);
+      }
+    }
+
+    // Load closed positions history
+    async function loadPositionsHistory() {
+      try {
+        const res = await fetch("/api/positions/history");
+        if (res.status === 401) return handleLogout();
+        const data = await res.json();
+        const historyPositions = data.positions || [];
+
+        safeText("positions-history-total-badge", `${data.total_positions} Closed`);
+
+        const container = document.getElementById("positions-history-table-body");
+        container.replaceChildren();
+
+        if (historyPositions.length === 0) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td"); td.colSpan = 7;
+          td.style.cssText = "text-align:center;padding:24px;color:var(--text-muted);font-size:13px;";
+          td.textContent = "No closed positions found in history.";
+          tr.appendChild(td); container.appendChild(tr);
+          return;
+        }
+
+        historyPositions.forEach(p => {
+          const tr = document.createElement("tr");
+
+          // Col 1: Pair / CA / Meteora link
+          const tdPair = document.createElement("td");
+          tdPair.style.cssText = "white-space:nowrap;";
+
+          const divPair = document.createElement("div");
+          divPair.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:4px;";
+          const pairName = document.createElement("span");
+          pairName.style.cssText = "font-weight:700;color:var(--text-primary);font-size:14px;";
+          pairName.textContent = p.pool_name || p.pair;
+
+          const metLink = document.createElement("a");
+          metLink.href = `https://app.meteora.ag/dlmm/${p.pool}`;
+          metLink.target = "_blank";
+          metLink.rel = "noopener noreferrer";
+          metLink.title = "Open on Meteora";
+          metLink.style.cssText = "color:var(--accent-light);opacity:0.7;display:inline-flex;align-items:center;transition:opacity 0.15s;flex-shrink:0;";
+          metLink.onmouseenter = () => metLink.style.opacity = '1';
+          metLink.onmouseleave = () => metLink.style.opacity = '0.7';
+          metLink.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`;
+          divPair.appendChild(pairName);
+          divPair.appendChild(metLink);
+
+          const divCA = document.createElement("div");
+          divCA.style.cssText = "display:flex;align-items:center;gap:4px;";
+          const caText = document.createElement("span");
+          caText.style.cssText = "font-family:monospace;font-size:11px;color:var(--text-muted);";
+          caText.textContent = p.position ? `${p.position.slice(0, 4)}...${p.position.slice(-4)}` : "??";
+
+          const copyBtn = document.createElement("button");
+          copyBtn.className = "btn-ghost btn-xs";
+          copyBtn.style.padding = "2px 4px";
+          copyBtn.textContent = "Copy";
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(p.position || "");
+            copyBtn.textContent = "✓";
+            copyBtn.style.color = "var(--success)";
+            setTimeout(() => {
+              copyBtn.textContent = "Copy";
+              copyBtn.style.color = "";
+            }, 1000);
+          };
+          divCA.appendChild(caText);
+          divCA.appendChild(copyBtn);
+
+          tdPair.appendChild(divPair);
+          tdPair.appendChild(divCA);
+          tr.appendChild(tdPair);
+
+          // Col 2: Amount (Initial SOL)
+          const tdAmount = document.createElement("td");
+          tdAmount.style.cssText = "font-weight:600;color:var(--text-primary);";
+          tdAmount.textContent = p.amount_sol ? `${Number(p.amount_sol).toFixed(2)} SOL` : "--";
+          tr.appendChild(tdAmount);
+
+          // Col 3: Closed PnL
+          const tdPeak = document.createElement("td");
+          tdPeak.style.cssText = "white-space:nowrap;";
+          const pnlPct = p.close_pnl_pct ?? 0;
+          const pnlUsd = p.close_pnl_usd ?? 0;
+          const pnlColor = pnlPct > 0 ? 'var(--success)'
+            : pnlPct < 0 ? 'var(--danger)' : 'var(--text-secondary)';
+          const pnlSign = pnlPct > 0 ? '+' : '';
+
+          const pnlPctEl = document.createElement("div");
+          pnlPctEl.style.cssText = `font-weight:700;font-size:13px;color:${pnlColor};`;
+          pnlPctEl.textContent = `${pnlSign}${Number(pnlPct).toFixed(2)}%`;
+
+          const pnlUsdEl = document.createElement("div");
+          pnlUsdEl.style.cssText = `font-size:10px;font-family:'JetBrains Mono';color:${pnlColor};opacity:0.85;margin-top:1px;`;
+          const usdSign = pnlUsd > 0 ? '+' : '';
+          pnlUsdEl.textContent = `${usdSign}$${Number(pnlUsd).toFixed(3)}`;
+
+          tdPeak.appendChild(pnlPctEl);
+          tdPeak.appendChild(pnlUsdEl);
+          tr.appendChild(tdPeak);
+
+          // Col 4: Total Fees
+          const tdFees = document.createElement("td");
+          tdFees.style.cssText = "color:var(--text-primary);";
+          tdFees.textContent = p.total_fees_claimed_usd ? `$${Number(p.total_fees_claimed_usd).toFixed(2)}` : "$0.00";
+          tr.appendChild(tdFees);
+
+          // Col 5: Timeline / Duration
+          const tdTimeline = document.createElement("td");
+          tdTimeline.style.cssText = "font-size:12px;color:var(--text-secondary);line-height:1.4;";
+
+          let durationStr = "--";
+          if (p.deployed_at && p.closed_at) {
+            const durationMs = new Date(p.closed_at).getTime() - new Date(p.deployed_at).getTime();
+            const durationMin = Math.floor(durationMs / 60000);
+            if (durationMin >= 0) {
+              if (durationMin < 60) {
+                durationStr = `${durationMin}m`;
+              } else {
+                const hrs = Math.floor(durationMin / 60);
+                const mins = durationMin % 60;
+                durationStr = `${hrs}h ${mins}m`;
+              }
+            }
+          }
+
+          const durationEl = document.createElement("div");
+          durationEl.style.cssText = "font-weight:700;color:var(--accent-light);font-size:12px;margin-bottom:2px;";
+          durationEl.textContent = `Duration: ${durationStr}`;
+
+          const deployEl = document.createElement("div");
+          deployEl.style.cssText = "font-size:11px;color:var(--text-secondary);opacity:0.85;";
+          deployEl.textContent = p.deployed_at ? `Opened: ${new Date(p.deployed_at).toLocaleString()}` : "Opened: --";
+
+          const closedEl = document.createElement("div");
+          closedEl.style.cssText = "font-size:11px;color:var(--text-muted);opacity:0.85;";
+          closedEl.textContent = p.closed_at ? `Closed: ${new Date(p.closed_at).toLocaleString()}` : "Closed: --";
+
+          tdTimeline.appendChild(durationEl);
+          tdTimeline.appendChild(deployEl);
+          tdTimeline.appendChild(closedEl);
+          tr.appendChild(tdTimeline);
+
+          // Col 7: Close Reason
+          const tdReason = document.createElement("td");
+          tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+
+          // Extract reason from last note
+          let reasonStr = "--";
+          if (p.notes && p.notes.length > 0) {
+            const lastNote = p.notes[p.notes.length - 1];
+            if (lastNote.includes("Closed at")) {
+              reasonStr = lastNote.split("Closed at")[1].replace(/^[^:]*:\s*/, "");
+            } else {
+              reasonStr = lastNote;
+            }
+          }
+          tdReason.textContent = reasonStr;
+          tdReason.title = reasonStr;
+          tr.appendChild(tdReason);
+
+          container.appendChild(tr);
+        });
+      } catch (e) {
+        console.error("Failed to load positions history", e);
+      }
+    }
+
+    // Build range bar DOM
+    function buildRangeBar(p) {
+      let progress = 0;
+      if (p.upper_bin !== p.lower_bin) {
+        progress = ((p.active_bin - p.lower_bin) / (p.upper_bin - p.lower_bin)) * 100;
+      }
+      progress = Math.max(0, Math.min(100, progress));
+      const cls = p.in_range ? "in" : "out";
+
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;min-width:160px;";
+
+      const labels = document.createElement("div");
+      labels.style.cssText = "display:flex;justify-content:space-between;font-size:9px;font-family:'JetBrains Mono';color:var(--text-muted);";
+      const lL = document.createElement("span"); lL.textContent = `L:${p.lower_bin}`;
+      const lA = document.createElement("span"); lA.textContent = `A:${p.active_bin}`; lA.style.cssText = "color:var(--text-secondary);font-weight:700;";
+      const lU = document.createElement("span"); lU.textContent = `U:${p.upper_bin}`;
+      labels.appendChild(lL); labels.appendChild(lA); labels.appendChild(lU);
+
+      const track = document.createElement("div");
+      track.className = "range-track";
+      const fill = document.createElement("div");
+      fill.className = `range-fill ${cls}`;
+      fill.style.width = `${progress}%`;
+      const dot = document.createElement("div");
+      dot.className = `range-dot ${cls}`;
+      dot.style.left = `${progress}%`;
+      track.appendChild(fill);
+      track.appendChild(dot);
+
+      wrap.appendChild(labels);
+      wrap.appendChild(track);
+      return wrap;
+    }
+
+    // ─── Price helpers ───────────────────────────────────────────
+    // Meteora DLMM: price = (1 + bin_step/10000)^binId
+    // Result is tokenX per tokenY. Since we want SOL price (Y/X), we invert.
+    function binToSolPrice(binId, binStep, decimalMultiplier = 1) {
+      if (binId == null || binStep == null) return null;
+      // price of X in terms of Y = (1 + binStep/10000)^binId * decimalMultiplier
+      return Math.pow(1 + binStep / 10000, binId) * decimalMultiplier;
+    }
+
+    // Format price in the compact subscript notation:
+    //   0.05₅000 means 0.05 × 10^-5 leading zeros = 0.0000050
+    // We show it as: integer part + subscript zero count + 3 significant digits
+    function formatPriceSubscript(price) {
+      if (price == null || !isFinite(price) || price <= 0) return '--';
+
+      // Prices >= 0.01 show normally (4 sig figs)
+      if (price >= 0.01) {
+        return price.toPrecision(4);
+      }
+
+      // Use toExponential to reliably count leading zeros and extract digits.
+      // e.g. 0.00035298 → "3.5298e-4"
+      //      0.000000056 → "5.6e-8"
+      const expStr = price.toExponential();
+      const [mantissa, eStr] = expStr.split('e');
+      const exp = parseInt(eStr);                // e.g. -4, -8
+      const leadingZeros = -exp - 1;             // e.g. 3, 7
+
+      // Get significant digits from mantissa string (strip the decimal point)
+      // "3.5298" → "35298"  |  "5.6" → "56"
+      const sigStr = mantissa.replace('.', '');  // all sig digits as a string
+      // Pad to at least 3 chars and take the first 3 (truncate, never round up)
+      const digits3 = sigStr.padEnd(3, '0').slice(0, 3);
+
+      // Build DOM node: "0.0" + <sub>n</sub> + "352"
+      const fragment = document.createDocumentFragment();
+      fragment.appendChild(document.createTextNode('0.0'));
+      const sub = document.createElement('sub');
+      sub.style.cssText = 'font-size:0.72em;line-height:1;vertical-align:sub;';
+      sub.textContent = leadingZeros;
+      fragment.appendChild(sub);
+      fragment.appendChild(document.createTextNode(digits3));
+      return fragment;
+    }
+
+    // Status badge
+    function buildStatusBadge(p) {
+      const badge = document.createElement("span");
+      const dot = document.createElement("span");
+      dot.className = "badge-dot";
+
+      if (p.in_range) {
+        badge.className = "badge-in-range";
+        dot.style.background = "var(--success)";
+        dot.className += " pulse-dot";
+        badge.appendChild(dot);
+        badge.appendChild(document.createTextNode("IN RANGE"));
+      } else {
+        badge.className = "badge-oor";
+        dot.style.background = "var(--warning)";
+        badge.appendChild(dot);
+        badge.appendChild(document.createTextNode(`OOR ${p.minutes_out_of_range || 0}m`));
+      }
+      return badge;
+    }
+
+    // Render positions table
+    function renderPositionsTable() {
+      const container = document.getElementById("positions-table-body");
+      container.replaceChildren();
+
+      if (dashboardState.positions.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td"); td.colSpan = 10;
+        td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
+        td.textContent = "No open LP positions found.";
+        tr.appendChild(td); container.appendChild(tr);
+        return;
+      }
+
+      dashboardState.positions.forEach((p) => {
+        const tr = document.createElement("tr");
+        // Use tracked bin_step from dashboardState or default to 100
+        const binStep = p.bin_step ?? dashboardState.config?.bin_step ?? 100;
+        const totalBins = (p.lower_bin != null && p.upper_bin != null)
+          ? (p.upper_bin - p.lower_bin + 1) : null;
+        const priceLow  = binToSolPrice(p.lower_bin, binStep, p.decimal_multiplier);
+        const priceHigh = binToSolPrice(p.upper_bin, binStep, p.decimal_multiplier);
+
+        // ── Col 1: Pair / CA / Meteora link ──
+        const tdPair = document.createElement("td");
+        tdPair.style.cssText = "white-space:nowrap;";
+
+        const divPair = document.createElement("div");
+        divPair.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:4px;";
+        const pairName = document.createElement("span");
+        pairName.style.cssText = "font-weight:700;color:var(--text-primary);font-size:14px;";
+        pairName.textContent = p.pair;
+
+        // Meteora external link icon
+        const metLink = document.createElement("a");
+        metLink.href = `https://app.meteora.ag/dlmm/${p.pool}`;
+        metLink.target = "_blank";
+        metLink.rel = "noopener noreferrer";
+        metLink.title = "Open on Meteora";
+        metLink.style.cssText = "color:var(--accent-light);opacity:0.7;display:inline-flex;align-items:center;transition:opacity 0.15s;flex-shrink:0;";
+        metLink.onmouseenter = () => metLink.style.opacity = '1';
+        metLink.onmouseleave = () => metLink.style.opacity = '0.7';
+        metLink.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`;
+        divPair.appendChild(pairName);
+        divPair.appendChild(metLink);
+
+        // CA row: short address + copy button
+        const divCA = document.createElement("div");
+        divCA.style.cssText = "display:flex;align-items:center;gap:4px;";
+        const caText = document.createElement("span");
+        caText.style.cssText = "font-size:9px;font-family:'JetBrains Mono';color:var(--text-muted);";
+        caText.textContent = `${p.pool.slice(0,6)}…${p.pool.slice(-6)}`;
+
+        const btnCopy = document.createElement("button");
+        btnCopy.title = "Copy pool address";
+        btnCopy.style.cssText = "background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;display:inline-flex;align-items:center;border-radius:4px;transition:all 0.15s;";
+        btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
+        btnCopy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(p.pool);
+            btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="#10d9a0" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+            setTimeout(() => { btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`; }, 1800);
+          } catch { showToast('Copy failed', 'error'); }
+        };
+        divCA.appendChild(caText);
+        divCA.appendChild(btnCopy);
+
+        tdPair.appendChild(divPair);
+        tdPair.appendChild(divCA);
+        tr.appendChild(tdPair);
+
+        // ── Col 2: Value ──
+        const tdVal = document.createElement("td");
+        tdVal.style.cssText = "font-weight:600;color:var(--text-primary);";
+        tdVal.textContent = `$${Number(p.total_value_usd).toFixed(2)}`;
+        tr.appendChild(tdVal);
+
+        // ── Col 3: PnL ──
+        const tdPnl = document.createElement("td");
+        tdPnl.style.cssText = "white-space:nowrap;";
+        const pnlPct = p.pnl_pct ?? null;
+        const pnlUsd = p.pnl_usd ?? null;
+        const pnlColor = pnlPct == null ? 'var(--text-muted)'
+          : pnlPct > 0 ? 'var(--success)'
+          : pnlPct < 0 ? 'var(--danger)' : 'var(--text-secondary)';
+        const pnlSign = pnlPct != null && pnlPct > 0 ? '+' : '';
+
+        const pnlPctEl = document.createElement("div");
+        pnlPctEl.style.cssText = `font-weight:700;font-size:13px;color:${pnlColor};`;
+        pnlPctEl.textContent = pnlPct != null ? `${pnlSign}${pnlPct.toFixed(2)}%` : '--';
+
+        const pnlUsdEl = document.createElement("div");
+        pnlUsdEl.style.cssText = `font-size:10px;font-family:'JetBrains Mono';color:${pnlColor};opacity:0.85;margin-top:1px;`;
+        if (pnlUsd != null) {
+          const usdSign = pnlUsd > 0 ? '+' : '';
+          pnlUsdEl.textContent = `${usdSign}$${Number(pnlUsd).toFixed(3)}`;
+        } else {
+          pnlUsdEl.textContent = '--';
+        }
+        tdPnl.appendChild(pnlPctEl);
+        tdPnl.appendChild(pnlUsdEl);
+        tr.appendChild(tdPnl);
+
+        // ── Col 4: Fees ──
+        const tdFees = document.createElement("td");
+        tdFees.style.cssText = "font-weight:700;color:var(--success);";
+        tdFees.textContent = `$${Number(p.unclaimed_fees_usd).toFixed(4)}`;
+        tr.appendChild(tdFees);
+
+        // ── Col 5: Yield (24h) ──
+        const tdYield = document.createElement("td");
+        tdYield.style.cssText = "font-weight:600;color:var(--accent-light);";
+        const yieldVal = p.fee_per_tvl_24h;
+        tdYield.textContent = yieldVal != null ? `${Number(yieldVal).toFixed(2)}%` : '--';
+        tr.appendChild(tdYield);
+
+        // ── Col 6: Price Range (SOL) with subscript format ──
+        const tdPrice = document.createElement("td");
+        tdPrice.style.cssText = "white-space:nowrap;font-family:'JetBrains Mono';font-size:12px;";
+
+        const priceRow = document.createElement("div");
+        priceRow.style.cssText = "display:flex;align-items:center;gap:4px;color:var(--text-secondary);";
+
+        if (priceLow != null && priceHigh != null) {
+          const lowNode = formatPriceSubscript(priceLow);
+          const highNode = formatPriceSubscript(priceHigh);
+          const separator = document.createElement("span");
+          separator.style.cssText = "color:var(--text-muted);font-size:10px;margin:0 2px;";
+          separator.textContent = '→';
+          if (lowNode instanceof DocumentFragment) priceRow.appendChild(lowNode);
+          else priceRow.appendChild(document.createTextNode(lowNode));
+          priceRow.appendChild(separator);
+          if (highNode instanceof DocumentFragment) priceRow.appendChild(highNode);
+          else priceRow.appendChild(document.createTextNode(highNode));
+        } else {
+          priceRow.style.color = 'var(--text-muted)';
+          priceRow.textContent = '--';
+        }
+
+        // Active bin range bar below
+        const rangeWrap = document.createElement("div"); rangeWrap.style.marginTop = "4px";
+        rangeWrap.appendChild(buildRangeBar(p));
+        tdPrice.appendChild(priceRow);
+        tdPrice.appendChild(rangeWrap);
+        tr.appendChild(tdPrice);
+
+        // ── Col 7: Total Bins ──
+        const tdBins = document.createElement("td");
+        tdBins.style.cssText = "text-align:center;font-weight:700;font-size:14px;color:var(--accent-light);";
+        if (totalBins != null) {
+          tdBins.textContent = totalBins;
+          const stepLabel = document.createElement("div");
+          stepLabel.style.cssText = "font-size:9px;font-weight:600;color:var(--text-muted);letter-spacing:0.05em;margin-top:1px;";
+          stepLabel.textContent = `step ${binStep}`;
+          tdBins.appendChild(stepLabel);
+        } else {
+          tdBins.textContent = '--';
+        }
+        tr.appendChild(tdBins);
+
+        // ── Col 8: Age ──
+        const tdAge = document.createElement("td");
+        tdAge.style.cssText = "color:var(--text-secondary);font-size:13px;";
+        const ageMin = p.age_minutes;
+        if (ageMin != null && ageMin >= 0) {
+          if (ageMin < 60) {
+            tdAge.textContent = `${ageMin}m`;
+          } else if (ageMin < 1440) {
+            const hrs = Math.floor(ageMin / 60);
+            const mins = ageMin % 60;
+            tdAge.textContent = `${hrs}h ${mins}m`;
+          } else {
+            const days = Math.floor(ageMin / 1440);
+            const hrs = Math.floor((ageMin % 1440) / 60);
+            tdAge.textContent = `${days}d ${hrs}h`;
+          }
+        } else {
+          tdAge.textContent = '--';
+        }
+        tr.appendChild(tdAge);
+
+        // ── Col 9: Status ──
+        const tdStatus = document.createElement("td");
+        tdStatus.appendChild(buildStatusBadge(p));
+        tr.appendChild(tdStatus);
+
+        // ── Col 8: Actions ──
+        const tdActions = document.createElement("td");
+        const ag = document.createElement("div");
+        ag.style.cssText = "display:flex;gap:6px;";
+
+        const btnNote = document.createElement("button");
+        btnNote.className = "btn-ghost btn-xs";
+        btnNote.textContent = p.instruction ? "✏ Edit Note" : "+ Note";
+        btnNote.onclick = () => showPositionNoteModal(p.position, p.instruction || "");
+
+        const btnClose = document.createElement("button");
+        btnClose.className = "btn-danger btn-xs";
+        btnClose.textContent = "Close";
+        btnClose.onclick = () => handleClosePosition(p.position, p.pair);
+
+        ag.appendChild(btnNote); ag.appendChild(btnClose);
+        tdActions.appendChild(ag);
+        tr.appendChild(tdActions);
+
+        container.appendChild(tr);
+      });
+    }
+
+    // Render dashboard grid
+    function renderDashboardPositionsGrid() {
+      const container = document.getElementById("dashboard-positions-list");
+      container.replaceChildren();
+
+      if (dashboardState.positions.length === 0) {
+        const div = document.createElement("div");
+        div.style.cssText = "grid-column:span 2;text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;background:var(--bg-elevated);border-radius:14px;border:1px solid var(--border-subtle);";
+        div.textContent = "No open positions. Ready to allocate capital.";
+        container.appendChild(div);
+        return;
+      }
+
+      dashboardState.positions.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "pos-card";
+
+        // Header
+        const header = document.createElement("div");
+        header.style.cssText = "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;";
+
+        const titleDiv = document.createElement("div");
+        const pairDiv = document.createElement("div");
+        pairDiv.style.cssText = "font-family:'Space Grotesk';font-size:15px;font-weight:700;color:#fff;";
+        pairDiv.textContent = p.pair;
+        const valDiv = document.createElement("div");
+        valDiv.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:2px;";
+        valDiv.textContent = `$${Number(p.total_value_usd).toFixed(2)} LP`;
+        titleDiv.appendChild(pairDiv); titleDiv.appendChild(valDiv);
+
+        header.appendChild(titleDiv);
+        header.appendChild(buildStatusBadge(p));
+        card.appendChild(header);
+
+        // Range
+        const rangeWrap = document.createElement("div");
+        rangeWrap.style.marginBottom = "12px";
+        rangeWrap.appendChild(buildRangeBar(p));
+        card.appendChild(rangeWrap);
+
+        // Stats
+        const statsGrid = document.createElement("div");
+        statsGrid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:12px;border-top:1px solid var(--border-subtle);";
+
+        const earnedDiv = document.createElement("div");
+        const elabel = document.createElement("div"); elabel.style.cssText = "font-size:9px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;color:var(--text-muted);"; elabel.textContent = "Unclaimed Fees";
+        const evalue = document.createElement("div"); evalue.style.cssText = "font-size:13px;font-weight:700;color:var(--success);margin-top:2px;"; evalue.textContent = `$${Number(p.unclaimed_fees_usd).toFixed(4)}`;
+        earnedDiv.appendChild(elabel); earnedDiv.appendChild(evalue);
+
+        const ageDiv = document.createElement("div");
+        const alabel = document.createElement("div"); alabel.style.cssText = "font-size:9px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;color:var(--text-muted);"; alabel.textContent = "Age";
+        const avalue = document.createElement("div"); avalue.style.cssText = "font-size:13px;font-weight:600;color:var(--text-secondary);margin-top:2px;"; avalue.textContent = `${p.age_minutes || 0} min`;
+        ageDiv.appendChild(alabel); ageDiv.appendChild(avalue);
+
+        statsGrid.appendChild(earnedDiv); statsGrid.appendChild(ageDiv);
+        card.appendChild(statsGrid);
+
+        // Instruction note
+        if (p.instruction) {
+          const note = document.createElement("div");
+          note.style.cssText = "margin-top:10px;font-size:11px;color:var(--accent-light);background:rgba(124,92,255,0.07);border:1px solid rgba(124,92,255,0.15);border-radius:8px;padding:8px 10px;display:flex;gap:6px;";
+          const icon = document.createElement("span"); icon.textContent = "💡";
+          const text = document.createElement("span"); text.textContent = p.instruction;
+          note.appendChild(icon); note.appendChild(text);
+          card.appendChild(note);
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    // Note modal
+    function showPositionNoteModal(position, instruction) {
+      document.getElementById("note-position-address").value = position;
+      document.getElementById("note-text").value = instruction;
+      document.getElementById("position-note-modal").showModal();
+    }
+
+    document.getElementById("position-note-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const position    = document.getElementById("note-position-address").value;
+      const instruction = document.getElementById("note-text").value;
+      try {
+        const res = await fetch("/api/positions/instruction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ position, instruction })
+        });
+        if (!res.ok) throw new Error();
+        showToast("Instruction note saved successfully.");
+        document.getElementById("position-note-modal").close();
+        loadPositions();
+      } catch {
+        showToast("Failed to save instruction note", "error");
+      }
+    });
+
+    // Close position
+    function handleClosePosition(position, pairName) {
+      closePositionPendingAddr = position;
+      closePositionPendingPair = pairName;
+      const pairSpan = document.getElementById("close-confirm-pair");
+      if (pairSpan) pairSpan.textContent = pairName;
+      document.getElementById("close-confirm-modal").showModal();
+    }
+
+    document.getElementById("btn-confirm-close").addEventListener("click", async () => {
+      document.getElementById("close-confirm-modal").close();
+      const position = closePositionPendingAddr;
+      const pairName = closePositionPendingPair;
+      if (!position) return;
+
+      showToast(`Initiating close for ${pairName}…`, "info");
+      try {
+        const res = await fetch("/api/positions/close", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ position })
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Closed ${pairName}. PnL: $${Number(data.pnl_usd).toFixed(2)}`);
+          loadPositions();
+        } else {
+          showToast(`Failed to close: ${data.error || "unknown error"}`, "error");
+        }
+      } catch {
+        showToast("Close transaction failed", "error");
+      }
+    });
+
+    // Load candidates
+    async function loadCandidates() {
+      const tbody = document.getElementById("screener-table-body");
+      tbody.replaceChildren();
+      const trLoading = document.createElement("tr");
+      const tdLoading = document.createElement("td"); tdLoading.colSpan = 6;
+      tdLoading.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
+      tdLoading.textContent = "Loading candidate pools…";
+      trLoading.appendChild(tdLoading); tbody.appendChild(trLoading);
+
+      try {
+        const res = await fetch("/api/candidates");
+        const data = await res.json();
+        dashboardState.candidates = data.candidates || data.pools || [];
+
+        tbody.replaceChildren();
+        if (dashboardState.candidates.length === 0) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td"); td.colSpan = 6;
+          td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
+          td.textContent = "No pools met filters. Try triggering a fresh screening run.";
+          tr.appendChild(td); tbody.appendChild(tr); return;
+        }
+
+        dashboardState.candidates.forEach((c) => {
+          const tr = document.createElement("tr");
+
+          // Name
+          const tdName = document.createElement("td");
+          const divName = document.createElement("div"); divName.style.cssText = "font-weight:700;color:var(--text-primary);font-size:14px;"; divName.textContent = c.name;
+          const divAddr = document.createElement("div"); divAddr.style.cssText = "font-size:9px;font-family:'JetBrains Mono';color:var(--text-muted);margin-top:2px;"; divAddr.textContent = `${c.pool.slice(0,10)}…${c.pool.slice(-10)}`;
+          tdName.appendChild(divName); tdName.appendChild(divAddr); tr.appendChild(tdName);
+
+          // Fee ratio
+          const tdRatio = document.createElement("td"); tdRatio.style.cssText = "font-weight:700;color:var(--accent-light);";
+          tdRatio.textContent = `${Number(c.fee_active_tvl_ratio || c.fee_tvl_ratio || 0).toFixed(2)}%`;
+          tr.appendChild(tdRatio);
+
+          // Vol/TVL
+          const tdMet = document.createElement("td");
+          const dv = document.createElement("div"); dv.style.cssText = "font-weight:600;color:var(--text-primary);"; dv.textContent = `Vol: $${Math.round(c.volume_window||0).toLocaleString()}`;
+          const dt = document.createElement("div"); dt.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:2px;"; dt.textContent = `TVL: $${Math.round(c.tvl||c.active_tvl||0).toLocaleString()}`;
+          tdMet.appendChild(dv); tdMet.appendChild(dt); tr.appendChild(tdMet);
+
+          // Organic score
+          const tdOrg = document.createElement("td"); tdOrg.style.cssText = "font-weight:600;color:var(--text-secondary);"; tdOrg.textContent = c.organic_score || "--"; tr.appendChild(tdOrg);
+
+          // Volatility
+          const tdVol = document.createElement("td"); tdVol.style.cssText = "font-weight:600;color:var(--text-secondary);"; tdVol.textContent = c.volatility || "--"; tr.appendChild(tdVol);
+
+          // Deploy
+          const tdDeploy = document.createElement("td");
+          const btnDeploy = document.createElement("button"); btnDeploy.className = "btn-primary btn-xs"; btnDeploy.textContent = "Deploy LP"; btnDeploy.onclick = () => showDeployModal(c);
+          tdDeploy.appendChild(btnDeploy); tr.appendChild(tdDeploy);
+
+          tbody.appendChild(tr);
+        });
+      } catch {
+        tbody.replaceChildren();
+        showToast("Failed to fetch pool candidates", "error");
+      }
+    }
+
+    // Deploy modal
+    function showDeployModal(candidate) {
+      document.getElementById("deploy-pool-address").value = candidate.pool;
+      document.getElementById("deploy-pool-name").value = candidate.name;
+      document.getElementById("deploy-amount").value = dashboardState.status.deployAmountSol || 0.5;
+      const parsedVolatility = Number(candidate.volatility);
+      let binsBelow = 69;
+      if (Number.isFinite(parsedVolatility) && parsedVolatility > 0) {
+        binsBelow = Math.max(35, Math.min(150, Math.round(35 + (parsedVolatility / 5) * 115)));
+      }
+      document.getElementById("deploy-bins-below").value = binsBelow;
+      document.getElementById("deploy-error").style.display = "none";
+      document.getElementById("deploy-modal").showModal();
+    }
+
+    document.getElementById("deploy-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pool_address = document.getElementById("deploy-pool-address").value;
+      const pool_name    = document.getElementById("deploy-pool-name").value;
+      const amount       = document.getElementById("deploy-amount").value;
+      const bins_below   = document.getElementById("deploy-bins-below").value;
+      const submitBtn    = document.getElementById("btn-submit-deploy");
+      const errEl        = document.getElementById("deploy-error");
+
+      submitBtn.disabled = true; errEl.style.display = "none";
+      showToast("Submitting deploy transaction to Solana…", "info");
+
+      try {
+        const res = await fetch("/api/candidates/deploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ pool_address, amount, bins_below, pool_name })
+        });
+        const data = await res.json();
+        if (res.ok && (data.success || (data.position && !data.error))) {
+          showToast(`Successfully deployed to ${pool_name}!`);
+          document.getElementById("deploy-modal").close();
+          loadPositions();
+        } else {
+          errEl.textContent = data.reason || data.error || "Deploy execution failed.";
+          errEl.style.display = "block";
+        }
+      } catch {
+        errEl.textContent = "Deploy connection timeout.";
+        errEl.style.display = "block";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Refresh candidates
+    async function triggerScreening() {
+      const btn = document.getElementById("btn-trigger-screen");
+      btn.disabled = true;
+      showToast("Background pool screening cycle started…", "info");
+      try {
+        await fetch("/api/candidates/screen", { method: "POST", headers: { "X-CSRF-Token": csrfToken } });
+        setTimeout(loadCandidates, 3000);
+      } catch {
+        showToast("Screening request failed", "error");
+      } finally {
+        setTimeout(() => { btn.disabled = false; }, 3000);
+      }
+    }
+
+    // Load decisions
+    async function loadDecisions() {
+      const tbody = document.getElementById("decisions-table-body");
+      tbody.replaceChildren();
+
+      try {
+        const res = await fetch("/api/decisions");
+        const data = await res.json();
+        dashboardState.decisions = Array.isArray(data) ? data : (data.decisions || []);
+        renderDashboardDecisionsFeed();
+
+        if (dashboardState.decisions.length === 0) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td"); td.colSpan = 4;
+          td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
+          td.textContent = "No logged agent decisions yet.";
+          tr.appendChild(td); tbody.appendChild(tr); return;
+        }
+
+        dashboardState.decisions.forEach((d) => {
+          const tr = document.createElement("tr");
+
+          const tdTime = document.createElement("td"); tdTime.style.cssText = "font-family:'JetBrains Mono';font-size:11px;color:var(--text-muted);";
+          tdTime.textContent = (d.ts || d.timestamp) ? new Date(d.ts || d.timestamp).toLocaleString() : "--"; tr.appendChild(tdTime);
+
+          const tdBadge = document.createElement("td");
+          const badge = document.createElement("span");
+          badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;";
+          const type = String(d.type).toLowerCase();
+          if (type === "deploy") { badge.style.background = "rgba(16,217,160,0.12)"; badge.style.color = "var(--success)"; badge.style.border = "1px solid rgba(16,217,160,0.25)"; badge.textContent = "DEPLOY"; }
+          else if (type === "close") { badge.style.background = "rgba(255,77,109,0.1)"; badge.style.color = "#ff6b8a"; badge.style.border = "1px solid rgba(255,77,109,0.25)"; badge.textContent = "CLOSE"; }
+          else if (type === "skip")  { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-muted)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = "SKIP"; }
+          else { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-secondary)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = String(d.type).toUpperCase(); }
+          tdBadge.appendChild(badge); tr.appendChild(tdBadge);
+
+          const tdSummary = document.createElement("td"); tdSummary.style.cssText = "font-weight:600;color:var(--text-primary);"; tdSummary.textContent = d.summary; tr.appendChild(tdSummary);
+          const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;max-width:320px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
+
+          tbody.appendChild(tr);
+        });
+      } catch {
+        showToast("Failed to load decisions log", "error");
+      }
+    }
+
+    // Dashboard decisions feed
+    function renderDashboardDecisionsFeed() {
+      const container = document.getElementById("dashboard-decisions-list");
+      container.replaceChildren();
+
+      const feed = dashboardState.decisions.slice(0, 5);
+      if (feed.length === 0) {
+        const div = document.createElement("div");
+        div.style.cssText = "text-align:center;padding:32px 16px;color:var(--text-muted);font-size:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border-subtle);";
+        div.textContent = "No log activities yet.";
+        container.appendChild(div); return;
+      }
+
+      feed.forEach(d => {
+        const item = document.createElement("div");
+        item.className = "feed-item";
+
+        const type = String(d.type).toLowerCase();
+        let icon;
+        if (type === "deploy") icon = document.getElementById("tmpl-icon-deploy").firstElementChild.cloneNode(true);
+        else if (type === "close") icon = document.getElementById("tmpl-icon-close").firstElementChild.cloneNode(true);
+        else icon = document.getElementById("tmpl-icon-skip").firstElementChild.cloneNode(true);
+
+        const body = document.createElement("div");
+        body.style.cssText = "min-width:0;flex:1;";
+
+        const title = document.createElement("div"); title.style.cssText = "font-size:12px;font-weight:700;color:var(--text-primary);"; title.textContent = d.summary;
+        const reason = document.createElement("div"); reason.style.cssText = "font-size:10px;font-family:'JetBrains Mono';color:var(--text-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"; reason.textContent = d.reason || "";
+
+        body.appendChild(title); body.appendChild(reason);
+        item.appendChild(icon); item.appendChild(body);
+        container.appendChild(item);
+      });
+    }
+
+    // Load lessons
+    async function loadLessons() {
+      const tperf = document.getElementById("lessons-perf-table-body");
+      const list   = document.getElementById("lessons-list");
+      tperf.replaceChildren(); list.replaceChildren();
+
+      try {
+        const res = await fetch("/api/lessons");
+        const data = await res.json();
+        dashboardState.lessons = data;
+
+        const perf = data.performance || [];
+        const closedCount = perf.length;
+        let winRate = "--", avgPnl = "--";
+        if (closedCount > 0) {
+          const wins = perf.filter(p => (p.pnl_pct || 0) >= 0).length;
+          winRate = `${((wins / closedCount) * 100).toFixed(0)}%`;
+          avgPnl  = `${(perf.reduce((a, p) => a + (p.pnl_pct || 0), 0) / closedCount).toFixed(2)}%`;
+        }
+        safeText("perf-closed-count", closedCount);
+        safeText("perf-win-rate", winRate);
+        safeText("perf-avg-pnl", avgPnl);
+
+        // Closed perf table
+        if (closedCount === 0) {
+          const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4;
+          td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;"; td.textContent = "No closed performance data available.";
+          tr.appendChild(td); tperf.appendChild(tr);
+        } else {
+          perf.slice(0, 10).forEach(p => {
+            const tr = document.createElement("tr");
+            const tdPool  = document.createElement("td"); tdPool.style.cssText  = "font-weight:700;color:var(--text-primary);"; tdPool.textContent  = p.pool_name || p.pool || "unknown"; tr.appendChild(tdPool);
+            const tdTime  = document.createElement("td"); tdTime.style.cssText  = "color:var(--text-secondary);font-weight:500;"; tdTime.textContent  = p.minutes_held ? `${Math.round(p.minutes_held)}m` : "--"; tr.appendChild(tdTime);
+            const tdReas  = document.createElement("td"); tdReas.style.cssText  = "color:var(--text-muted);font-size:12px;"; tdReas.textContent  = p.close_reason || "OOR close"; tr.appendChild(tdReas);
+            const tdPnl   = document.createElement("td");
+            const pnlVal = p.pnl_pct || 0;
+            const spanPnl = document.createElement("span"); spanPnl.style.cssText = `font-weight:700;color:${pnlVal >= 0 ? 'var(--success)' : '#ff6b8a'};`;
+            spanPnl.textContent = `${pnlVal >= 0 ? "+" : ""}${pnlVal.toFixed(2)}%`;
+            tdPnl.appendChild(spanPnl); tr.appendChild(tdPnl);
+            tperf.appendChild(tr);
+          });
+        }
+
+        // Lessons list
+        const lessons = data.lessons || [];
+        if (lessons.length === 0) {
+          const div = document.createElement("div");
+          div.style.cssText = "text-align:center;padding:32px;color:var(--text-muted);font-size:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border-subtle);";
+          div.textContent = "No lessons recorded yet. Close positions to trigger study.";
+          list.appendChild(div);
+        } else {
+          lessons.forEach(l => {
+            const item = document.createElement("div");
+            item.className = "lesson-card";
+
+            const hdr = document.createElement("div"); hdr.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-subtle);";
+            const spanRole = document.createElement("span"); spanRole.style.cssText = "font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:rgba(124,92,255,0.1);color:var(--accent-light);border:1px solid rgba(124,92,255,0.2);"; spanRole.textContent = String(l.role || "all");
+            const tagCont = document.createElement("div"); tagCont.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;";
+            (l.tags || []).forEach(t => {
+              const st = document.createElement("span"); st.style.cssText = "font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--bg-base);color:var(--text-muted);border:1px solid var(--border-subtle);"; st.textContent = t;
+              tagCont.appendChild(st);
+            });
+            hdr.appendChild(spanRole); hdr.appendChild(tagCont);
+
+            const ruleP = document.createElement("p"); ruleP.style.cssText = "font-size:12px;color:var(--text-secondary);line-height:1.6;margin:0;"; ruleP.textContent = l.rule;
+
+            item.appendChild(hdr); item.appendChild(ruleP);
+            list.appendChild(item);
+          });
+        }
+      } catch {
+        showToast("Failed to load lessons and performance stats", "error");
+      }
+    }
+
+    // Add lesson
+    document.getElementById("add-lesson-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rule = document.getElementById("lesson-rule-text").value;
+      const tags = document.getElementById("lesson-tags").value.split(",").map(t => t.trim()).filter(Boolean);
+      try {
+        const res = await fetch("/api/lessons/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ rule, tags })
+        });
+        if (!res.ok) throw new Error();
+        showToast("Manual lesson stored.");
+        document.getElementById("add-lesson-modal").close();
+        document.getElementById("lesson-rule-text").value = "";
+        document.getElementById("lesson-tags").value = "";
+        loadLessons();
+      } catch {
+        showToast("Failed to record manual lesson", "error");
+      }
+    });
+
+    // Load config
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/config");
+        const data = await res.json();
+        dashboardState.config = data;
+
+        document.getElementById("cfg-deployAmountSol").value = data.management.deployAmountSol;
+        document.getElementById("cfg-minSolToOpen").value = data.management.minSolToOpen;
+        document.getElementById("cfg-gasReserve").value = data.management.gasReserve;
+        document.getElementById("cfg-maxPositions").value = data.risk.maxPositions;
+        document.getElementById("cfg-maxDeployAmount").value = data.risk.maxDeployAmount;
+        document.getElementById("cfg-solMode").checked = !!data.management.solMode;
+        
+        document.getElementById("cfg-takeProfitPct").value = data.management.takeProfitPct !== null ? data.management.takeProfitPct : "";
+        document.getElementById("cfg-stopLossPct").value = data.management.stopLossPct !== null ? data.management.stopLossPct : "";
+        document.getElementById("cfg-trailingTakeProfit").checked = data.management.trailingTakeProfit;
+        document.getElementById("cfg-trailingTriggerPct").value = data.management.trailingTriggerPct;
+        document.getElementById("cfg-trailingDropPct").value = data.management.trailingDropPct;
+        document.getElementById("cfg-outOfRangeBinsToClose").value = data.management.outOfRangeBinsToClose;
+        document.getElementById("cfg-outOfRangeWaitMinutes").value = data.management.outOfRangeWaitMinutes;
+        document.getElementById("cfg-minFeePerTvl24h").value = data.management.minFeePerTvl24h;
+        document.getElementById("cfg-minAgeBeforeYieldCheck").value = data.management.minAgeBeforeYieldCheck;
+        
+        document.getElementById("cfg-timeframe").value = data.screening.timeframe;
+        document.getElementById("cfg-minVolume").value = data.screening.minVolume;
+        document.getElementById("cfg-minTvl").value = data.screening.minTvl;
+        document.getElementById("cfg-maxTvl").value = data.screening.maxTvl;
+        document.getElementById("cfg-minMcap").value = data.screening.minMcap;
+        document.getElementById("cfg-maxMcap").value = data.screening.maxMcap;
+        document.getElementById("cfg-minOrganic").value = data.screening.minOrganic;
+        document.getElementById("cfg-minHolders").value = data.screening.minHolders;
+        document.getElementById("cfg-minBinStep").value = data.screening.minBinStep;
+        document.getElementById("cfg-maxBinStep").value = data.screening.maxBinStep;
+        document.getElementById("cfg-minFeeActiveTvlRatio").value = data.screening.minFeeActiveTvlRatio;
+        document.getElementById("cfg-minBinsBelow").value = data.strategy.minBinsBelow;
+        document.getElementById("cfg-maxBinsBelow").value = data.strategy.maxBinsBelow;
+        document.getElementById("cfg-defaultBinsBelow").value = data.strategy.defaultBinsBelow;
+        
+        document.getElementById("cfg-managementIntervalMin").value = data.schedule.managementIntervalMin;
+        document.getElementById("cfg-screeningIntervalMin").value = data.schedule.screeningIntervalMin;
+        document.getElementById("cfg-screeningModel").value = data.llm.screeningModel;
+        document.getElementById("cfg-managementModel").value = data.llm.managementModel;
+      } catch {
+        showToast("Failed to load settings", "error");
+      }
+    }
+
+    // Save config
+    async function saveConfiguration() {
+      const changes = {
+        deployAmountSol: Number(document.getElementById("cfg-deployAmountSol").value),
+        minSolToOpen: Number(document.getElementById("cfg-minSolToOpen").value),
+        gasReserve: Number(document.getElementById("cfg-gasReserve").value),
+        maxPositions: Math.round(Number(document.getElementById("cfg-maxPositions").value)),
+        maxDeployAmount: Number(document.getElementById("cfg-maxDeployAmount").value),
+        solMode: document.getElementById("cfg-solMode").checked,
+        
+        takeProfitPct: document.getElementById("cfg-takeProfitPct").value === "" ? null : Number(document.getElementById("cfg-takeProfitPct").value),
+        stopLossPct: document.getElementById("cfg-stopLossPct").value === "" ? null : Number(document.getElementById("cfg-stopLossPct").value),
+        trailingTakeProfit: document.getElementById("cfg-trailingTakeProfit").checked,
+        trailingTriggerPct: Number(document.getElementById("cfg-trailingTriggerPct").value),
+        trailingDropPct: Number(document.getElementById("cfg-trailingDropPct").value),
+        outOfRangeBinsToClose: Math.round(Number(document.getElementById("cfg-outOfRangeBinsToClose").value)),
+        outOfRangeWaitMinutes: Math.round(Number(document.getElementById("cfg-outOfRangeWaitMinutes").value)),
+        minFeePerTvl24h: Number(document.getElementById("cfg-minFeePerTvl24h").value),
+        minAgeBeforeYieldCheck: Math.round(Number(document.getElementById("cfg-minAgeBeforeYieldCheck").value)),
+        
+        timeframe: document.getElementById("cfg-timeframe").value,
+        minVolume: Number(document.getElementById("cfg-minVolume").value),
+        minTvl: Number(document.getElementById("cfg-minTvl").value),
+        maxTvl: Number(document.getElementById("cfg-maxTvl").value),
+        minMcap: Number(document.getElementById("cfg-minMcap").value),
+        maxMcap: Number(document.getElementById("cfg-maxMcap").value),
+        minOrganic: Math.round(Number(document.getElementById("cfg-minOrganic").value)),
+        minHolders: Math.round(Number(document.getElementById("cfg-minHolders").value)),
+        minBinStep: Math.round(Number(document.getElementById("cfg-minBinStep").value)),
+        maxBinStep: Math.round(Number(document.getElementById("cfg-maxBinStep").value)),
+        minFeeActiveTvlRatio: Number(document.getElementById("cfg-minFeeActiveTvlRatio").value),
+        minBinsBelow: Math.round(Number(document.getElementById("cfg-minBinsBelow").value)),
+        maxBinsBelow: Math.round(Number(document.getElementById("cfg-maxBinsBelow").value)),
+        defaultBinsBelow: Math.round(Number(document.getElementById("cfg-defaultBinsBelow").value)),
+        
+        managementIntervalMin: Math.round(Number(document.getElementById("cfg-managementIntervalMin").value)),
+        screeningIntervalMin: Math.round(Number(document.getElementById("cfg-screeningIntervalMin").value)),
+        screeningModel: document.getElementById("cfg-screeningModel").value,
+        managementModel: document.getElementById("cfg-managementModel").value,
+      };
+      try {
+        const res = await fetch("/api/config/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ changes })
+        });
+        if (!res.ok) throw new Error();
+        showToast("Configuration saved successfully.");
+        loadConfig();
+      } catch {
+        showToast("Failed to save configurations", "error");
+      }
+    }
+
+    // Quick actions
+    async function triggerQuickAction(actionType) {
+      showToast(actionType === "screen" ? "Triggering pool screen…" : "Triggering management run…", "info");
+      try {
+        const endpoint = actionType === "screen" ? "/api/candidates/screen" : "/api/control/run-management";
+        const res = await fetch(endpoint, { method: "POST", headers: { "X-CSRF-Token": csrfToken } });
+        if (!res.ok) throw new Error();
+        showToast("Agent loop cycle initiated in background.");
+      } catch {
+        showToast("Failed to trigger agent loops", "error");
+      }
+    }
+
+    // Toggle cron
+    async function toggleCronState() {
+      const action = dashboardState.status.cronStarted ? "pause" : "resume";
+      showToast(`${action === "pause" ? "Pausing" : "Resuming"} cron schedules…`, "info");
+      try {
+        const res = await fetch("/api/control/toggle-cron", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ action })
+        });
+        if (!res.ok) throw new Error();
+        showToast(`Cron schedules ${action === "pause" ? "paused" : "resumed"}.`);
+        loadStatus();
+      } catch {
+        showToast("Failed to toggle cron status", "error");
+      }
+    }
+
+    // ═══════════════════ MOBILE BOTTOM NAV ═══════════════════
+    const BNAV_TABS = ['dashboard', 'positions', 'decisions'];
+    const MORE_TABS = ['lessons', 'config'];
+
+    function syncBottomNav(tabId) {
+      BNAV_TABS.forEach(t => {
+        const btn = document.getElementById(`bnav-${t}`);
+        if (btn) btn.classList.toggle('active', t === tabId);
+      });
+      const moreBtn = document.getElementById('bnav-more');
+      if (moreBtn) moreBtn.classList.toggle('active', MORE_TABS.includes(tabId));
+      MORE_TABS.forEach(t => {
+        const item = document.getElementById(`more-btn-${t}`);
+        if (item) item.classList.toggle('active', t === tabId);
+      });
+    }
+
+    function toggleMoreMenu() {
+      const menu = document.getElementById('more-menu');
+      const backdrop = document.getElementById('more-backdrop');
+      const isOpen = menu.classList.toggle('open');
+      backdrop.classList.toggle('open', isOpen);
+    }
+
+    function closeMoreMenu() {
+      document.getElementById('more-menu').classList.remove('open');
+      document.getElementById('more-backdrop').classList.remove('open');
+    }
+
+    function closeMobileMenu() { closeMoreMenu(); }
+
+    function moreNav(tabId) {
+      switchTab(tabId);
+      closeMoreMenu();
+      window.scrollTo(0, 0);
+      const ca = document.getElementById('content-area');
+      if (ca) ca.scrollTop = 0;
+    }
+
+    // Patch switchTab to sync bottom nav active state
+    const _origSwitchTab = switchTab;
+    switchTab = function(tabId) {
+      _origSwitchTab(tabId);
+      syncBottomNav(tabId);
+    };
+
+    // Close more menu when tapping content area
+    document.getElementById('content-area').addEventListener('touchstart', closeMoreMenu, { passive: true });
+
+    // Check active session on load
+    checkSession();
+  </script>
+</body>
+</html>
