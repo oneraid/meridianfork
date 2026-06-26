@@ -1301,6 +1301,20 @@
                     <input type="number" step="1" id="cfg-minAgeBeforeYieldCheck" class="form-input">
                   </div>
                 </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">PnL Confirm Ticks</label>
+                    <input type="number" step="1" id="cfg-pnlConfirmTicks" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Auto-Swap Retries</label>
+                    <input type="number" step="1" id="cfg-autoSwapRetryAttempts" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Auto-Swap Delay (ms)</label>
+                    <input type="number" step="100" id="cfg-autoSwapRetryDelayMs" class="form-input">
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1326,6 +1340,16 @@
                   <div class="form-group">
                     <label class="form-label">Min 24h Volume (USD)</label>
                     <input type="number" step="100" id="cfg-minVolume" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min fee/active-TVL ratio (%)</label>
+                    <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Lone Candidate Min Degen</label>
+                    <input type="number" step="1" id="cfg-loneCandidateMinDegen" class="form-input">
                   </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -1368,10 +1392,7 @@
                     <input type="number" step="1" id="cfg-maxBinStep" class="form-input">
                   </div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Min fee/active-TVL ratio (%)</label>
-                  <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
-                </div>
+
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
                   <div class="form-group">
                     <label class="form-label">Min Bins Below</label>
@@ -1384,6 +1405,64 @@
                   <div class="form-group">
                     <label class="form-label">Default Bins</label>
                     <input type="number" step="1" id="cfg-defaultBinsBelow" class="form-input">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opportunity Poller & Degen Score Calibration -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Opportunity Poller & Degen Score Calibration
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
+                  <input type="checkbox" id="cfg-opportunityPollEnabled" class="form-checkbox">
+                  <label for="cfg-opportunityPollEnabled" class="form-label" style="cursor:pointer;margin:0;">Enable Opportunity Poller</label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Poll Interval (sec)</label>
+                    <input type="number" step="1" id="cfg-opportunityPollIntervalSec" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Poll Limit (pools)</label>
+                    <input type="number" step="1" id="cfg-opportunityPollLimit" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Degen Score to Deploy</label>
+                    <input type="number" step="1" id="cfg-opportunityMinScore" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Smart Wallet Bonus Score</label>
+                    <input type="number" step="1" id="cfg-opportunitySmartWalletBonus" class="form-input">
+                  </div>
+                </div>
+                
+                <div style="margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
+                  <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Degen Score Targets (30m normalized)</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                       <label class="form-label">Target Vol/Tvl Ratio</label>
+                       <input type="number" step="1" id="cfg-degenTargetVolRatio" class="form-input">
+                    </div>
+                    <div class="form-group">
+                       <label class="form-label">Target LP Count</label>
+                       <input type="number" step="1" id="cfg-degenTargetLpCount" class="form-input">
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                    <div class="form-group">
+                       <label class="form-label">Target Fee/Tvl Ratio</label>
+                       <input type="number" step="0.05" id="cfg-degenTargetFeeRatio" class="form-input">
+                    </div>
+                    <div class="form-group">
+                       <label class="form-label">Target Liquidity (USD)</label>
+                       <input type="number" step="1000" id="cfg-degenTargetLiquidity" class="form-input">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3047,6 +3126,11 @@
         document.getElementById("cfg-minFeePerTvl24h").value = data.management.minFeePerTvl24h;
         document.getElementById("cfg-minAgeBeforeYieldCheck").value = data.management.minAgeBeforeYieldCheck;
         
+        // New PnL & Auto-Swap settings
+        document.getElementById("cfg-pnlConfirmTicks").value = data.pnl?.confirmTicks ?? 2;
+        document.getElementById("cfg-autoSwapRetryAttempts").value = data.management.autoSwapRetryAttempts ?? 3;
+        document.getElementById("cfg-autoSwapRetryDelayMs").value = data.management.autoSwapRetryDelayMs ?? 3000;
+        
         document.getElementById("cfg-timeframe").value = data.screening.timeframe;
         document.getElementById("cfg-minVolume").value = data.screening.minVolume;
         document.getElementById("cfg-minTvl").value = data.screening.minTvl;
@@ -3058,9 +3142,21 @@
         document.getElementById("cfg-minBinStep").value = data.screening.minBinStep;
         document.getElementById("cfg-maxBinStep").value = data.screening.maxBinStep;
         document.getElementById("cfg-minFeeActiveTvlRatio").value = data.screening.minFeeActiveTvlRatio;
+        document.getElementById("cfg-loneCandidateMinDegen").value = data.screening.loneCandidateMinDegen ?? 50;
         document.getElementById("cfg-minBinsBelow").value = data.strategy.minBinsBelow;
         document.getElementById("cfg-maxBinsBelow").value = data.strategy.maxBinsBelow;
         document.getElementById("cfg-defaultBinsBelow").value = data.strategy.defaultBinsBelow;
+        
+        // Opportunity Poller & Degen Targets
+        document.getElementById("cfg-opportunityPollEnabled").checked = !!data.opportunity?.enabled;
+        document.getElementById("cfg-opportunityPollIntervalSec").value = data.opportunity?.pollIntervalSec ?? 45;
+        document.getElementById("cfg-opportunityPollLimit").value = data.opportunity?.limit ?? 10;
+        document.getElementById("cfg-opportunityMinScore").value = data.opportunity?.minScore ?? 40;
+        document.getElementById("cfg-opportunitySmartWalletBonus").value = data.opportunity?.smartWalletScoreBonus ?? 20;
+        document.getElementById("cfg-degenTargetVolRatio").value = data.opportunity?.targetVolRatio ?? 20;
+        document.getElementById("cfg-degenTargetLpCount").value = data.opportunity?.targetLpCount ?? 40;
+        document.getElementById("cfg-degenTargetFeeRatio").value = data.opportunity?.targetFeeRatio ?? 0.20;
+        document.getElementById("cfg-degenTargetLiquidity").value = data.opportunity?.targetLiquidity ?? 20000;
         
         document.getElementById("cfg-managementIntervalMin").value = data.schedule.managementIntervalMin;
         document.getElementById("cfg-screeningIntervalMin").value = data.schedule.screeningIntervalMin;
@@ -3091,6 +3187,11 @@
         minFeePerTvl24h: Number(document.getElementById("cfg-minFeePerTvl24h").value),
         minAgeBeforeYieldCheck: Math.round(Number(document.getElementById("cfg-minAgeBeforeYieldCheck").value)),
         
+        // PnL & Auto-swap changes
+        pnlConfirmTicks: Math.round(Number(document.getElementById("cfg-pnlConfirmTicks").value)),
+        autoSwapRetryAttempts: Math.round(Number(document.getElementById("cfg-autoSwapRetryAttempts").value)),
+        autoSwapRetryDelayMs: Math.round(Number(document.getElementById("cfg-autoSwapRetryDelayMs").value)),
+        
         timeframe: document.getElementById("cfg-timeframe").value,
         minVolume: Number(document.getElementById("cfg-minVolume").value),
         minTvl: Number(document.getElementById("cfg-minTvl").value),
@@ -3102,9 +3203,21 @@
         minBinStep: Math.round(Number(document.getElementById("cfg-minBinStep").value)),
         maxBinStep: Math.round(Number(document.getElementById("cfg-maxBinStep").value)),
         minFeeActiveTvlRatio: Number(document.getElementById("cfg-minFeeActiveTvlRatio").value),
+        loneCandidateMinDegen: Math.round(Number(document.getElementById("cfg-loneCandidateMinDegen").value)),
         minBinsBelow: Math.round(Number(document.getElementById("cfg-minBinsBelow").value)),
         maxBinsBelow: Math.round(Number(document.getElementById("cfg-maxBinsBelow").value)),
         defaultBinsBelow: Math.round(Number(document.getElementById("cfg-defaultBinsBelow").value)),
+        
+        // Opportunity Poller changes
+        opportunityPollEnabled: document.getElementById("cfg-opportunityPollEnabled").checked,
+        opportunityPollIntervalSec: Math.round(Number(document.getElementById("cfg-opportunityPollIntervalSec").value)),
+        opportunityPollLimit: Math.round(Number(document.getElementById("cfg-opportunityPollLimit").value)),
+        opportunityMinScore: Math.round(Number(document.getElementById("cfg-opportunityMinScore").value)),
+        opportunitySmartWalletBonus: Math.round(Number(document.getElementById("cfg-opportunitySmartWalletBonus").value)),
+        degenTargetVolRatio: Number(document.getElementById("cfg-degenTargetVolRatio").value),
+        degenTargetLpCount: Math.round(Number(document.getElementById("cfg-degenTargetLpCount").value)),
+        degenTargetFeeRatio: Number(document.getElementById("cfg-degenTargetFeeRatio").value),
+        degenTargetLiquidity: Number(document.getElementById("cfg-degenTargetLiquidity").value),
         
         managementIntervalMin: Math.round(Number(document.getElementById("cfg-managementIntervalMin").value)),
         screeningIntervalMin: Math.round(Number(document.getElementById("cfg-screeningIntervalMin").value)),

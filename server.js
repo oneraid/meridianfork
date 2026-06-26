@@ -453,6 +453,8 @@ export function startDashboardServer(context = {}) {
       schedule: config.schedule,
       llm: config.llm,
       strategy: config.strategy,
+      pnl: config.pnl,
+      opportunity: config.opportunity,
     });
   });
 
