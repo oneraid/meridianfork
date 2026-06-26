@@ -9,7 +9,7 @@ import { getTopCandidates } from "./tools/screening.js";
 import { config } from "./config.js";
 import { log } from "./logger.js";
 import { REPO_ROOT, repoPath } from "./repo-root.js";
-import { getTrackedPositions } from "./state.js";
+import { getTrackedPositions, recordPortfolioSnapshot, getPortfolioHistory } from "./state.js";
 import { Connection } from "@solana/web3.js";
 
 let apiStatusCache = null;
@@ -207,6 +207,18 @@ export function startDashboardServer(context = {}) {
     try {
       const balances = await getWalletBalances().catch(() => ({ sol: 0, sol_usd: 0, sol_price: 0, tokens: [] }));
       const statusData = context.getStatus ? context.getStatus() : {};
+
+      // Record daily portfolio snapshot (uses cached positions if TTL hasn't expired)
+      const livePositions = await getMyPositions().catch(() => ({ positions: [], total_positions: 0 }));
+      const positionsVal = (livePositions?.positions || []).reduce((sum, p) => sum + (Number(p.total_value_usd) || 0), 0);
+      const solPrice = Number(balances.sol_price) || 0;
+      const walletVal = Number(balances.sol_usd) || (Number(balances.sol) * solPrice);
+      const totalPortfolioValue = walletVal + positionsVal;
+      const totalPortfolioValueSol = solPrice > 0 ? (totalPortfolioValue / solPrice) : Number(balances.sol);
+      // Record hourly portfolio snapshot (wallet SOL + LP positions value in SOL)
+      if (totalPortfolioValue > 0) {
+        recordPortfolioSnapshot(totalPortfolioValue, totalPortfolioValueSol);
+      }
 
       // Calculate Winrate
       const allTracked = getTrackedPositions(false);
@@ -418,6 +430,15 @@ export function startDashboardServer(context = {}) {
       
       const result = await executeTool("add_lesson", { rule, tags });
       res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/portfolio/history", requireAuth, (req, res) => {
+    try {
+      const history = getPortfolioHistory();
+      res.json({ success: true, history });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

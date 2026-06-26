@@ -633,7 +633,10 @@ export async function executeTool(name, args) {
           pair: result.pool_name || args.position_address?.slice(0, 8),
           pnlUsd: result.pnl_usd ?? 0,
           pnlPct: result.pnl_pct ?? 0,
+          pnlTrueUsd: result.pnl_true_usd ?? 0,
+          pnlTruePct: result.pnl_true_pct ?? 0,
           feesUsd: result.fees_usd ?? 0,
+          fee_per_tvl_24h: result.fee_per_tvl_24h ?? null,
           minutesHeld: result.minutes_held ?? 0,
           reason: args.reason || "autonomous decision"
         }).catch(() => {});

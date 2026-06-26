@@ -1244,6 +1244,16 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
           : binData
             ? deriveOpenPnlPct(binData, config.management.solMode)
             : null;
+        const reportedPnlTruePct = lpData
+          ? parseFloat(lpData.pnl?.percent || 0)
+          : binData
+            ? parseFloat(binData.pnlPctChange || 0)
+            : null;
+        const derivedPnlTruePct = lpData
+          ? deriveLpAgentPnlPct(lpData, false)
+          : binData
+            ? deriveOpenPnlPct(binData, false)
+            : null;
         const pnlPctDiff = reportedPnlPct != null && derivedPnlPct != null
           ? Math.abs(reportedPnlPct - derivedPnlPct)
           : null;
@@ -1323,6 +1333,9 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
             : null,
           pnl_pct:            (lpData || binData)
             ? Math.round(reportedPnlPct * 100) / 100
+            : null,
+          pnl_true_pct:       (lpData || binData)
+            ? Math.round((reportedPnlTruePct ?? derivedPnlTruePct ?? 0) * 100) / 100
             : null,
           pnl_pct_derived:    derivedPnlPct != null ? Math.round(derivedPnlPct * 100) / 100 : null,
           pnl_pct_diff:       pnlPctDiff != null ? Math.round(pnlPctDiff * 100) / 100 : null,
@@ -1514,6 +1527,9 @@ export async function closePosition({ position_address, reason }) {
     return { dry_run: true, would_close: position_address, message: "DRY RUN — no transaction sent" };
   }
 
+  const cachedPos = _positionsCache?.positions?.find(p => p.position === position_address);
+  const lastKnownYield = cachedPos?.fee_per_tvl_24h ?? null;
+
   const tracked = getTrackedPosition(position_address);
 
   try {
@@ -1634,6 +1650,7 @@ export async function closePosition({ position_address, reason }) {
         let pnlUsd = 0;
         let pnlTrueUsd = 0;
         let pnlPct = 0;
+        let pnlTruePct = 0;
         let finalValueUsd = 0;
         let initialUsd = 0;
         let feesUsd = tracked.total_fees_claimed_usd || 0;
@@ -1648,6 +1665,7 @@ export async function closePosition({ position_address, reason }) {
                 pnlTrueUsd = safeNum(posEntry.pnlUsd);
                 pnlUsd = config.management.solMode ? getClosedPnlValue(posEntry, true) : pnlTrueUsd;
                 pnlPct = getClosedPnlPct(posEntry, config.management.solMode);
+                pnlTruePct = getClosedPnlPct(posEntry, false);
                 finalValueUsd = parseFloat(posEntry.allTimeWithdrawals?.total?.usd || 0);
                 initialUsd = parseFloat(posEntry.allTimeDeposits?.total?.usd || 0);
                 feesUsd = parseFloat(posEntry.allTimeFees?.total?.usd || 0) || feesUsd;
@@ -1740,7 +1758,10 @@ export async function closePosition({ position_address, reason }) {
           txs: txHashes,
           pnl_usd: pnlUsd,
           pnl_pct: pnlPct,
+          pnl_true_usd: pnlTrueUsd,
+          pnl_true_pct: pnlTruePct,
           fees_usd: feesUsd,
+          fee_per_tvl_24h: lastKnownYield,
           minutes_held: minutesHeld,
           base_mint: closeBaseMint,
         };
@@ -1909,6 +1930,7 @@ export async function closePosition({ position_address, reason }) {
       let pnlUsd = 0;
       let pnlTrueUsd = 0;
       let pnlPct = 0;
+      let pnlTruePct = 0;
       let finalValueUsd = 0;
       let initialUsd = 0;
       let feesUsd = tracked.total_fees_claimed_usd || 0;
@@ -1923,6 +1945,7 @@ export async function closePosition({ position_address, reason }) {
               const nextPnlUsd = safeNum(posEntry.pnlUsd);
               const nextPnlValue = config.management.solMode ? getClosedPnlValue(posEntry, true) : nextPnlUsd;
               const nextPnlPct = getClosedPnlPct(posEntry, config.management.solMode);
+              const nextPnlTruePct = getClosedPnlPct(posEntry, false);
               const nextFinalValueUsd = parseFloat(posEntry.allTimeWithdrawals?.total?.usd || 0);
               const nextInitialUsd = parseFloat(posEntry.allTimeDeposits?.total?.usd || 0);
               const nextFeesUsd = parseFloat(posEntry.allTimeFees?.total?.usd || 0) || feesUsd;
@@ -1933,6 +1956,7 @@ export async function closePosition({ position_address, reason }) {
                 pnlTrueUsd    = nextPnlUsd;
                 pnlUsd        = nextPnlValue;
                 pnlPct        = nextPnlPct;
+                pnlTruePct    = nextPnlTruePct;
                 finalValueUsd = nextFinalValueUsd;
                 initialUsd    = nextInitialUsd;
                 feesUsd       = nextFeesUsd;
@@ -1955,6 +1979,7 @@ export async function closePosition({ position_address, reason }) {
           pnlTrueUsd    = cachedPos.pnl_true_usd ?? (config.management.solMode ? 0 : cachedPos.pnl_usd) ?? 0;
           pnlUsd        = config.management.solMode ? (cachedPos.pnl_usd ?? 0) : pnlTrueUsd;
           pnlPct        = cachedPos.pnl_pct   ?? 0;
+          pnlTruePct    = cachedPos.pnl_true_pct ?? (config.management.solMode ? 0 : cachedPos.pnl_pct) ?? 0;
           feesUsd       = (cachedPos.collected_fees_true_usd || 0) + (cachedPos.unclaimed_fees_true_usd || 0);
           initialUsd    = tracked.initial_value_usd || 0;
           if (initialUsd > 0) {
@@ -2047,7 +2072,10 @@ export async function closePosition({ position_address, reason }) {
         txs: txHashes,
         pnl_usd: pnlUsd,
         pnl_pct: pnlPct,
+        pnl_true_usd: pnlTrueUsd,
+        pnl_true_pct: pnlTruePct,
         fees_usd: feesUsd,
+        fee_per_tvl_24h: lastKnownYield,
         minutes_held: minutesHeld,
         base_mint: closeBaseMint,
       };

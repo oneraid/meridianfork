@@ -1,6 +1,8 @@
 import fs from "fs";
 import { log } from "./logger.js";
 import { repoPath } from "./repo-root.js";
+import { escapeHtml } from "./utils/html.js";
+import { config } from "./config.js";
 
 const USER_CONFIG_PATH = repoPath("user-config.json");
 
@@ -474,47 +476,79 @@ export async function notifyDeploy({ pair, amountSol, position, tx, priceRange, 
     ? `Bin step: ${binStep ?? "?"}  |  Base fee: ${baseFee != null ? baseFee + "%" : "?"}\n`
     : "";
   await sendHTML(
-    `✅ <b>Deployed</b> ${pair}\n` +
+    `✅ <b>Deployed</b> ${escapeHtml(pair)}\n` +
     `Amount: ${amountSol} SOL\n` +
     priceStr +
     coverageStr +
     poolStr +
-    `Position: <code>${position?.slice(0, 8)}...</code>\n` +
-    `Tx: <code>${tx?.slice(0, 16)}...</code>`
+    `Position: <code>${escapeHtml(position?.slice(0, 8))}...</code>\n` +
+    `Tx: <code>${escapeHtml(tx?.slice(0, 16))}...</code>`
   );
 }
 
-export async function notifyClose({ pair, pnlUsd, pnlPct, feesUsd, minutesHeld, reason }) {
+export async function notifyClose({ pair, pnlUsd, pnlPct, pnlTrueUsd, pnlTruePct, feesUsd, fee_per_tvl_24h, minutesHeld, reason }) {
   if (hasActiveLiveMessage()) return;
-  const pnlSign = pnlUsd >= 0 ? "+" : "-";
-  const pnlPctSign = pnlPct >= 0 ? "+" : "-";
+  const solMode = config.management.solMode;
   
-  const ageStr = minutesHeld != null ? `${minutesHeld}m` : "?m";
+  const ageStr = minutesHeld != null
+    ? (minutesHeld >= 60 ? `${Math.floor(minutesHeld / 60)}h ${minutesHeld % 60}m` : `${minutesHeld}m`)
+    : "?m";
   const feesStr = feesUsd != null ? `$${Number(feesUsd).toFixed(2)}` : "$--";
-  const pnlStr = `${pnlPctSign}${Math.abs(pnlPct).toFixed(2)}% (${pnlSign}$${Math.abs(pnlUsd).toFixed(2)})`;
+  const yieldStr = fee_per_tvl_24h != null ? `${Number(fee_per_tvl_24h).toFixed(2)}%` : null;
+
+  // Dynamic emoji based on PnL
+  const refPnl      = solMode ? (pnlTrueUsd ?? pnlUsd) : pnlUsd;
+  const isWin       = refPnl > 0;
+  const isBreak     = refPnl === 0;
+  const pnlEmoji    = isWin ? "🟢" : isBreak ? "⬜" : "🔴";
+  const headerEmoji = isWin ? "🎉" : isBreak ? "➖" : "💸";
+  const statusLabel = isWin ? "Profit" : isBreak ? "Breakeven" : "Loss";
+  
+  let pnlStr;
+  if (solMode) {
+    const pnlSign        = pnlUsd > 0 ? "+" : pnlUsd < 0 ? "-" : "";
+    const pnlPctSign     = pnlPct > 0 ? "+" : pnlPct < 0 ? "-" : "";
+    const pnlTrueSign    = pnlTrueUsd > 0 ? "+" : pnlTrueUsd < 0 ? "-" : "";
+    const pnlTruePctSign = pnlTruePct > 0 ? "+" : pnlTruePct < 0 ? "-" : "";
+    pnlStr =
+      ` ├─ ${pnlEmoji} PnL (SOL): <b>${pnlPctSign}${Math.abs(pnlPct).toFixed(2)}%</b> (${pnlSign}◎${Math.abs(pnlUsd).toFixed(4)})\n` +
+      ` ├─ ${pnlEmoji} PnL (USD): <b>${pnlTruePctSign}${Math.abs(pnlTruePct).toFixed(2)}%</b> (${pnlTrueSign}$${Math.abs(pnlTrueUsd).toFixed(2)})`;
+  } else {
+    const pnlSign    = pnlUsd > 0 ? "+" : pnlUsd < 0 ? "-" : "";
+    const pnlPctSign = pnlPct > 0 ? "+" : pnlPct < 0 ? "-" : "";
+    pnlStr = ` ├─ ${pnlEmoji} PnL: <b>${pnlPctSign}${Math.abs(pnlPct).toFixed(2)}%</b> (${pnlSign}$${Math.abs(pnlUsd).toFixed(2)})`;
+  }
+
+  const yieldLine = yieldStr ? ` ├─ 💸 Yield (24h): <b>${yieldStr}</b>\n` : "";
+  const bigWin = isWin && Math.abs(pnlPct) >= 5
+    ? `\n🚀 <i>Nice trade! +${Math.abs(pnlPct).toFixed(2)}% secured.</i>`
+    : "";
 
   await sendHTML(
-    `🔒 <b>Closed Position</b>\n\n` +
-    `🔹 <b>${pair}</b> (Age: ${ageStr})\n` +
-    ` ├─ 🎁 Fees Claimed: ${feesStr}\n` +
-    ` ├─ 📈 PnL: ${pnlStr}\n` +
-    ` └─ 🛠 Reason: <b>${reason || "autonomous decision"}</b>`
+    `${headerEmoji} <b>Position Closed · ${statusLabel}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🔹 <b>${escapeHtml(pair)}</b> · ⏱ ${ageStr}\n` +
+    pnlStr + `\n` +
+    ` ├─ 🎁 Fees: <b>${feesStr}</b>\n` +
+    yieldLine +
+    ` └─ 🛠 <i>${escapeHtml(reason || "autonomous decision")}</i>` +
+    bigWin
   );
 }
 
 export async function notifySwap({ inputSymbol, outputSymbol, amountIn, amountOut, tx }) {
   if (hasActiveLiveMessage()) return;
   await sendHTML(
-    `🔄 <b>Swapped</b> ${inputSymbol} → ${outputSymbol}\n` +
+    `🔄 <b>Swapped</b> ${escapeHtml(inputSymbol)} → ${escapeHtml(outputSymbol)}\n` +
     `In: ${amountIn ?? "?"} | Out: ${amountOut ?? "?"}\n` +
-    `Tx: <code>${tx?.slice(0, 16)}...</code>`
+    `Tx: <code>${escapeHtml(tx?.slice(0, 16))}...</code>`
   );
 }
 
 export async function notifyOutOfRange({ pair, minutesOOR }) {
   if (hasActiveLiveMessage()) return;
   await sendHTML(
-    `⚠️ <b>Out of Range</b> ${pair}\n` +
+    `⚠️ <b>Out of Range</b> ${escapeHtml(pair)}\n` +
     `Been OOR for ${minutesOOR} minutes`
   );
 }
