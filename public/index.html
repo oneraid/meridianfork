@@ -730,9 +730,158 @@
       border: 1px solid var(--border-subtle);
       border-radius: 12px;
       padding: 14px 16px;
-      transition: border-color 0.18s;
+      transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+      cursor: pointer;
+      position: relative;
     }
-    .lesson-card:hover { border-color: var(--border-bright); }
+    .lesson-card:hover { border-color: var(--border-bright); box-shadow: 0 4px 24px rgba(124,92,255,0.13); transform: translateY(-1px); }
+    .lesson-card-click-hint {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+      color: var(--accent-light);
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.18s;
+      white-space: nowrap;
+      pointer-events: none;
+      padding: 1px 6px;
+      border-radius: 99px;
+      border: 1px solid rgba(124,92,255,0.25);
+      background: rgba(124,92,255,0.08);
+    }
+    .lesson-card:hover .lesson-card-click-hint { opacity: 1; }
+
+    /* ═══════════════════ LESSON DETAIL MODAL ═══════════════════ */
+    #lesson-detail-modal {
+      max-width: 620px;
+      width: 95vw;
+    }
+    .lesson-detail-section {
+      margin-bottom: 16px;
+    }
+    .lesson-detail-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .lesson-detail-value {
+      font-size: 13px; color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .lesson-detail-config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .lesson-detail-config-item {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .lesson-detail-config-key {
+      font-size: 10px; font-weight: 700; color: var(--accent-light);
+      letter-spacing: 0.04em; margin-bottom: 2px;
+    }
+    .lesson-detail-config-val {
+      font-size: 13px; font-weight: 600; color: var(--text-primary);
+    }
+    .lesson-detail-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .lesson-detail-metric {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .lesson-detail-metric-label {
+      font-size: 10px; color: var(--text-muted); margin-bottom: 4px;
+    }
+    .lesson-detail-metric-val {
+      font-size: 16px; font-weight: 700;
+    }
+    .lesson-detail-context {
+      font-size: 11px; color: var(--text-muted);
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 12px;
+      line-height: 1.7;
+      word-break: break-word;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .lesson-detail-tag {
+      display: inline-block;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--bg-base);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+      margin-right: 4px;
+    }
+    .lesson-outcome-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 10px; border-radius: 99px;
+    }
+    .lesson-outcome-badge.good   { background: rgba(34,211,102,0.12); color: #22d366; border: 1px solid rgba(34,211,102,0.25); }
+    .lesson-outcome-badge.bad    { background: rgba(255,77,109,0.12); color: #ff6b8a; border: 1px solid rgba(255,77,109,0.25); }
+    .lesson-outcome-badge.manual { background: rgba(124,92,255,0.12); color: var(--accent-light); border: 1px solid rgba(124,92,255,0.25); }
+    .lesson-outcome-badge.config { background: rgba(251,191,36,0.10); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+
+    /* ═══════════════════ PAGINATION ═══════════════════ */
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 4px 0;
+      gap: 8px;
+    }
+    .pager-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .pager-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pager-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      line-height: 1;
+    }
+    .pager-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent-light);
+      background: rgba(124,92,255,0.08);
+    }
+    .pager-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .pager-page {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+      padding: 0 6px;
+      white-space: nowrap;
+    }
 
     /* ═══════════════════ SECTION HEADERS ═══════════════════ */
     .section-header {
@@ -1070,7 +1219,7 @@
             </div>
             <span id="positions-history-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">-- Closed</span>
           </div>
-          <div class="panel" style="overflow:hidden; margin-bottom: 32px;">
+          <div class="panel" style="overflow:hidden; margin-bottom:8px;">
             <table class="data-table">
               <thead>
                 <tr>
@@ -1084,6 +1233,14 @@
               </thead>
               <tbody id="positions-history-table-body"></tbody>
             </table>
+          </div>
+          <div class="pager" id="history-pager" style="margin-bottom:32px;">
+            <span class="pager-info" id="history-pager-info"></span>
+            <div class="pager-controls">
+              <button class="pager-btn" id="history-pager-prev" onclick="historyPage(-1)">← Prev</button>
+              <span class="pager-page" id="history-pager-page"></span>
+              <button class="pager-btn" id="history-pager-next" onclick="historyPage(1)">Next →</button>
+            </div>
           </div>
         </div>
 
@@ -1129,7 +1286,7 @@
               <div style="font-size:12px;color:var(--text-muted);">Structured audit trail of all agent operations</div>
             </div>
           </div>
-          <div class="panel" style="overflow:hidden; margin-bottom:32px;">
+          <div class="panel" style="overflow:hidden; margin-bottom:8px;">
             <table class="data-table">
               <thead>
                 <tr>
@@ -1141,6 +1298,14 @@
               </thead>
               <tbody id="decisions-table-body"></tbody>
             </table>
+          </div>
+          <div class="pager" id="decisions-pager">
+            <span class="pager-info" id="decisions-pager-info"></span>
+            <div class="pager-controls">
+              <button class="pager-btn" id="decisions-pager-prev" onclick="decisionsPage(-1)">← Prev</button>
+              <span class="pager-page" id="decisions-pager-page"></span>
+              <button class="pager-btn" id="decisions-pager-next" onclick="decisionsPage(1)">Next →</button>
+            </div>
           </div>
         </div>
 
@@ -1174,6 +1339,14 @@
                 <button onclick="document.getElementById('add-lesson-modal').showModal()" class="btn-primary btn-xs">Add Lesson</button>
               </div>
               <div id="lessons-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+              <div class="pager" id="lessons-pager">
+                <span class="pager-info" id="lessons-pager-info"></span>
+                <div class="pager-controls">
+                  <button class="pager-btn" id="lessons-pager-prev" onclick="lessonsPage(-1)">← Prev</button>
+                  <span class="pager-page" id="lessons-pager-page"></span>
+                  <button class="pager-btn" id="lessons-pager-next" onclick="lessonsPage(1)">Next →</button>
+                </div>
+              </div>
             </div>
             <!-- Performance table -->
             <div>
@@ -1193,6 +1366,14 @@
                   </thead>
                   <tbody id="lessons-perf-table-body"></tbody>
                 </table>
+              </div>
+              <div class="pager" id="perf-pager">
+                <span class="pager-info" id="perf-pager-info"></span>
+                <div class="pager-controls">
+                  <button class="pager-btn" id="perf-pager-prev" onclick="perfPage(-1)">← Prev</button>
+                  <span class="pager-page" id="perf-pager-page"></span>
+                  <button class="pager-btn" id="perf-pager-next" onclick="perfPage(1)">Next →</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1626,6 +1807,23 @@
     </form>
   </dialog>
 
+  <!-- Lesson Detail Popup Modal -->
+  <dialog id="lesson-detail-modal" class="meridian-modal">
+    <div class="modal-header" id="lesson-detail-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="modal-title" id="lesson-detail-title">Lesson Detail</div>
+        <span id="lesson-detail-outcome-badge"></span>
+      </div>
+      <div class="modal-subtitle" id="lesson-detail-subtitle"></div>
+    </div>
+    <div class="modal-body" id="lesson-detail-body" style="display:flex;flex-direction:column;gap:0;max-height:70vh;overflow-y:auto;">
+      <!-- Dynamically populated -->
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="document.getElementById('lesson-detail-modal').close()" class="btn-ghost">Close</button>
+    </div>
+  </dialog>
+
   <!-- Close Confirm Modal -->
   <dialog id="close-confirm-modal" class="meridian-modal">
     <div class="modal-header" style="border-color:rgba(255,77,109,0.2);">
@@ -1657,6 +1855,7 @@
     let dashboardState = {
       status: {},
       positions: [],
+      positionsHistory: [],
       candidates: [],
       decisions: [],
       lessons: {},
@@ -2188,28 +2387,54 @@
     }
 
     // Load closed positions history
+    const historyPagination = { page: 0, perPage: 10 };
     async function loadPositionsHistory() {
       try {
         const res = await fetch("/api/positions/history");
         if (res.status === 401) return handleLogout();
         const data = await res.json();
-        const historyPositions = data.positions || [];
-
+        dashboardState.positionsHistory = data.positions || [];
         safeText("positions-history-total-badge", `${data.total_positions} Closed`);
+        historyPagination.page = 0;
+        renderHistoryPage();
+      } catch (e) {
+        console.error("Failed to load positions history", e);
+      }
+    }
 
-        const container = document.getElementById("positions-history-table-body");
-        container.replaceChildren();
+    function historyPage(dir) {
+      const total = (dashboardState.positionsHistory || []).length;
+      const maxPage = Math.max(0, Math.ceil(total / historyPagination.perPage) - 1);
+      historyPagination.page = Math.min(maxPage, Math.max(0, historyPagination.page + dir));
+      renderHistoryPage();
+    }
 
-        if (historyPositions.length === 0) {
-          const tr = document.createElement("tr");
-          const td = document.createElement("td"); td.colSpan = 7;
-          td.style.cssText = "text-align:center;padding:24px;color:var(--text-muted);font-size:13px;";
-          td.textContent = "No closed positions found in history.";
-          tr.appendChild(td); container.appendChild(tr);
-          return;
-        }
+    function renderHistoryPage() {
+      const container = document.getElementById("positions-history-table-body");
+      container.replaceChildren();
+      const { page, perPage } = historyPagination;
+      const historyPositions = dashboardState.positionsHistory || [];
+      const total = historyPositions.length;
+      const start = page * perPage;
+      const slice = historyPositions.slice(start, start + perPage);
 
-        historyPositions.forEach(p => {
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      document.getElementById("history-pager-info").textContent = total === 0 ? "" : `${start + 1}–${Math.min(start + perPage, total)} dari ${total}`;
+      document.getElementById("history-pager-page").textContent = total === 0 ? "" : `Hal ${page + 1} / ${totalPages}`;
+      document.getElementById("history-pager-prev").disabled = page === 0;
+      document.getElementById("history-pager-next").disabled = page >= totalPages - 1;
+      document.getElementById("history-pager").style.display = total <= perPage ? "none" : "flex";
+
+      if (total === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td"); td.colSpan = 7;
+        td.style.cssText = "text-align:center;padding:24px;color:var(--text-muted);font-size:13px;";
+        td.textContent = "No closed positions found in history.";
+        tr.appendChild(td); container.appendChild(tr);
+        return;
+      }
+
+      slice.forEach(p => {
           const tr = document.createElement("tr");
 
           // Col 1: Pair / CA / Meteora link
@@ -2330,11 +2555,10 @@
           tdTimeline.appendChild(closedEl);
           tr.appendChild(tdTimeline);
 
-          // Col 7: Close Reason
+          // Col 6: Close Reason
           const tdReason = document.createElement("td");
           tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
 
-          // Extract reason from last note
           let reasonStr = "--";
           if (p.notes && p.notes.length > 0) {
             const lastNote = p.notes[p.notes.length - 1];
@@ -2350,9 +2574,6 @@
 
           container.appendChild(tr);
         });
-      } catch (e) {
-        console.error("Failed to load positions history", e);
-      }
     }
 
     // Build range bar DOM
@@ -2926,48 +3147,67 @@
     }
 
     // Load decisions
+    const decisionsPagination = { page: 0, perPage: 10 };
     async function loadDecisions() {
-      const tbody = document.getElementById("decisions-table-body");
-      tbody.replaceChildren();
-
+      decisionsPagination.page = 0;
       try {
         const res = await fetch("/api/decisions");
         const data = await res.json();
         dashboardState.decisions = Array.isArray(data) ? data : (data.decisions || []);
         renderDashboardDecisionsFeed();
-
-        if (dashboardState.decisions.length === 0) {
-          const tr = document.createElement("tr");
-          const td = document.createElement("td"); td.colSpan = 4;
-          td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
-          td.textContent = "No logged agent decisions yet.";
-          tr.appendChild(td); tbody.appendChild(tr); return;
-        }
-
-        dashboardState.decisions.forEach((d) => {
-          const tr = document.createElement("tr");
-
-          const tdTime = document.createElement("td"); tdTime.style.cssText = "font-family:'JetBrains Mono';font-size:11px;color:var(--text-muted);";
-          tdTime.textContent = (d.ts || d.timestamp) ? new Date(d.ts || d.timestamp).toLocaleString() : "--"; tr.appendChild(tdTime);
-
-          const tdBadge = document.createElement("td");
-          const badge = document.createElement("span");
-          badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;";
-          const type = String(d.type).toLowerCase();
-          if (type === "deploy") { badge.style.background = "rgba(16,217,160,0.12)"; badge.style.color = "var(--success)"; badge.style.border = "1px solid rgba(16,217,160,0.25)"; badge.textContent = "DEPLOY"; }
-          else if (type === "close") { badge.style.background = "rgba(255,77,109,0.1)"; badge.style.color = "#ff6b8a"; badge.style.border = "1px solid rgba(255,77,109,0.25)"; badge.textContent = "CLOSE"; }
-          else if (type === "skip")  { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-muted)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = "SKIP"; }
-          else { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-secondary)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = String(d.type).toUpperCase(); }
-          tdBadge.appendChild(badge); tr.appendChild(tdBadge);
-
-          const tdSummary = document.createElement("td"); tdSummary.style.cssText = "font-weight:600;color:var(--text-primary);"; tdSummary.textContent = d.summary; tr.appendChild(tdSummary);
-          const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;max-width:320px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
-
-          tbody.appendChild(tr);
-        });
+        renderDecisionsPage();
       } catch {
         showToast("Failed to load decisions log", "error");
       }
+    }
+    function decisionsPage(dir) {
+      const total = dashboardState.decisions.length;
+      const maxPage = Math.max(0, Math.ceil(total / decisionsPagination.perPage) - 1);
+      decisionsPagination.page = Math.min(maxPage, Math.max(0, decisionsPagination.page + dir));
+      renderDecisionsPage();
+    }
+    function renderDecisionsPage() {
+      const tbody = document.getElementById("decisions-table-body");
+      tbody.replaceChildren();
+      const { page, perPage } = decisionsPagination;
+      const all = dashboardState.decisions;
+      const total = all.length;
+      const start = page * perPage;
+      const slice = all.slice(start, start + perPage);
+
+      // Update pager UI
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      document.getElementById("decisions-pager-info").textContent = total === 0 ? "" : `${start + 1}–${Math.min(start + perPage, total)} dari ${total}`;
+      document.getElementById("decisions-pager-page").textContent = total === 0 ? "" : `Hal ${page + 1} / ${totalPages}`;
+      document.getElementById("decisions-pager-prev").disabled = page === 0;
+      document.getElementById("decisions-pager-next").disabled = page >= totalPages - 1;
+      document.getElementById("decisions-pager").style.display = total <= perPage ? "none" : "flex";
+
+      if (total === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td"); td.colSpan = 4;
+        td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
+        td.textContent = "No logged agent decisions yet.";
+        tr.appendChild(td); tbody.appendChild(tr); return;
+      }
+
+      slice.forEach((d) => {
+        const tr = document.createElement("tr");
+        const tdTime = document.createElement("td"); tdTime.style.cssText = "font-family:'JetBrains Mono';font-size:11px;color:var(--text-muted);";
+        tdTime.textContent = (d.ts || d.timestamp) ? new Date(d.ts || d.timestamp).toLocaleString() : "--"; tr.appendChild(tdTime);
+        const tdBadge = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;";
+        const type = String(d.type).toLowerCase();
+        if (type === "deploy") { badge.style.background = "rgba(16,217,160,0.12)"; badge.style.color = "var(--success)"; badge.style.border = "1px solid rgba(16,217,160,0.25)"; badge.textContent = "DEPLOY"; }
+        else if (type === "close") { badge.style.background = "rgba(255,77,109,0.1)"; badge.style.color = "#ff6b8a"; badge.style.border = "1px solid rgba(255,77,109,0.25)"; badge.textContent = "CLOSE"; }
+        else if (type === "skip")  { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-muted)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = "SKIP"; }
+        else { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-secondary)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = String(d.type).toUpperCase(); }
+        tdBadge.appendChild(badge); tr.appendChild(tdBadge);
+        const tdSummary = document.createElement("td"); tdSummary.style.cssText = "font-weight:600;color:var(--text-primary);"; tdSummary.textContent = d.summary; tr.appendChild(tdSummary);
+        const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;max-width:320px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
+        tbody.appendChild(tr);
+      });
     }
 
     // Dashboard decisions feed
@@ -3006,11 +3246,12 @@
     }
 
     // Load lessons
-    async function loadLessons() {
-      const tperf = document.getElementById("lessons-perf-table-body");
-      const list   = document.getElementById("lessons-list");
-      tperf.replaceChildren(); list.replaceChildren();
+    const perfPagination    = { page: 0, perPage: 10 };
+    const lessonsPagination = { page: 0, perPage: 10 };
 
+    async function loadLessons() {
+      perfPagination.page = 0;
+      lessonsPagination.page = 0;
       try {
         const res = await fetch("/api/lessons");
         const data = await res.json();
@@ -3028,56 +3269,294 @@
         safeText("perf-win-rate", winRate);
         safeText("perf-avg-pnl", avgPnl);
 
-        // Closed perf table
-        if (closedCount === 0) {
-          const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4;
-          td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;"; td.textContent = "No closed performance data available.";
-          tr.appendChild(td); tperf.appendChild(tr);
-        } else {
-          perf.slice(0, 10).forEach(p => {
-            const tr = document.createElement("tr");
-            const tdPool  = document.createElement("td"); tdPool.style.cssText  = "font-weight:700;color:var(--text-primary);"; tdPool.textContent  = p.pool_name || p.pool || "unknown"; tr.appendChild(tdPool);
-            const tdTime  = document.createElement("td"); tdTime.style.cssText  = "color:var(--text-secondary);font-weight:500;"; tdTime.textContent  = p.minutes_held ? `${Math.round(p.minutes_held)}m` : "--"; tr.appendChild(tdTime);
-            const tdReas  = document.createElement("td"); tdReas.style.cssText  = "color:var(--text-muted);font-size:12px;"; tdReas.textContent  = p.close_reason || "OOR close"; tr.appendChild(tdReas);
-            const tdPnl   = document.createElement("td");
-            const pnlVal = p.pnl_pct || 0;
-            const spanPnl = document.createElement("span"); spanPnl.style.cssText = `font-weight:700;color:${pnlVal >= 0 ? 'var(--success)' : '#ff6b8a'};`;
-            spanPnl.textContent = `${pnlVal >= 0 ? "+" : ""}${pnlVal.toFixed(2)}%`;
-            tdPnl.appendChild(spanPnl); tr.appendChild(tdPnl);
-            tperf.appendChild(tr);
-          });
-        }
-
-        // Lessons list
-        const lessons = data.lessons || [];
-        if (lessons.length === 0) {
-          const div = document.createElement("div");
-          div.style.cssText = "text-align:center;padding:32px;color:var(--text-muted);font-size:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border-subtle);";
-          div.textContent = "No lessons recorded yet. Close positions to trigger study.";
-          list.appendChild(div);
-        } else {
-          lessons.forEach(l => {
-            const item = document.createElement("div");
-            item.className = "lesson-card";
-
-            const hdr = document.createElement("div"); hdr.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-subtle);";
-            const spanRole = document.createElement("span"); spanRole.style.cssText = "font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:rgba(124,92,255,0.1);color:var(--accent-light);border:1px solid rgba(124,92,255,0.2);"; spanRole.textContent = String(l.role || "all");
-            const tagCont = document.createElement("div"); tagCont.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;";
-            (l.tags || []).forEach(t => {
-              const st = document.createElement("span"); st.style.cssText = "font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--bg-base);color:var(--text-muted);border:1px solid var(--border-subtle);"; st.textContent = t;
-              tagCont.appendChild(st);
-            });
-            hdr.appendChild(spanRole); hdr.appendChild(tagCont);
-
-            const ruleP = document.createElement("p"); ruleP.style.cssText = "font-size:12px;color:var(--text-secondary);line-height:1.6;margin:0;"; ruleP.textContent = l.rule;
-
-            item.appendChild(hdr); item.appendChild(ruleP);
-            list.appendChild(item);
-          });
-        }
+        renderPerfPage();
+        renderLessonsPage();
       } catch {
         showToast("Failed to load lessons and performance stats", "error");
       }
+    }
+
+    function perfPage(dir) {
+      const total = (dashboardState.lessons?.performance || []).length;
+      const maxPage = Math.max(0, Math.ceil(total / perfPagination.perPage) - 1);
+      perfPagination.page = Math.min(maxPage, Math.max(0, perfPagination.page + dir));
+      renderPerfPage();
+    }
+    function renderPerfPage() {
+      const tperf = document.getElementById("lessons-perf-table-body");
+      tperf.replaceChildren();
+      const { page, perPage } = perfPagination;
+      const perf = (dashboardState.lessons?.performance || []);
+      const total = perf.length;
+      const start = page * perPage;
+      const slice = perf.slice(start, start + perPage);
+
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      document.getElementById("perf-pager-info").textContent = total === 0 ? "" : `${start + 1}–${Math.min(start + perPage, total)} dari ${total}`;
+      document.getElementById("perf-pager-page").textContent = total === 0 ? "" : `Hal ${page + 1} / ${totalPages}`;
+      document.getElementById("perf-pager-prev").disabled = page === 0;
+      document.getElementById("perf-pager-next").disabled = page >= totalPages - 1;
+      document.getElementById("perf-pager").style.display = total <= perPage ? "none" : "flex";
+
+      if (total === 0) {
+        const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4;
+        td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;"; td.textContent = "No closed performance data available.";
+        tr.appendChild(td); tperf.appendChild(tr);
+      } else {
+        slice.forEach(p => {
+          const tr = document.createElement("tr");
+          const tdPool  = document.createElement("td"); tdPool.style.cssText  = "font-weight:700;color:var(--text-primary);"; tdPool.textContent  = p.pool_name || p.pool || "unknown"; tr.appendChild(tdPool);
+          const tdTime  = document.createElement("td"); tdTime.style.cssText  = "color:var(--text-secondary);font-weight:500;"; tdTime.textContent  = p.minutes_held ? `${Math.round(p.minutes_held)}m` : "--"; tr.appendChild(tdTime);
+          const tdReas  = document.createElement("td"); tdReas.style.cssText  = "color:var(--text-muted);font-size:12px;"; tdReas.textContent  = p.close_reason || "OOR close"; tr.appendChild(tdReas);
+          const tdPnl   = document.createElement("td");
+          const pnlVal = p.pnl_pct || 0;
+          const spanPnl = document.createElement("span"); spanPnl.style.cssText = `font-weight:700;color:${pnlVal >= 0 ? 'var(--success)' : '#ff6b8a'};`;
+          spanPnl.textContent = `${pnlVal >= 0 ? "+" : ""}${pnlVal.toFixed(2)}%`;
+          tdPnl.appendChild(spanPnl); tr.appendChild(tdPnl);
+          tperf.appendChild(tr);
+        });
+      }
+    }
+
+    function lessonsPage(dir) {
+      const total = (dashboardState.lessons?.lessons || []).length;
+      const maxPage = Math.max(0, Math.ceil(total / lessonsPagination.perPage) - 1);
+      lessonsPagination.page = Math.min(maxPage, Math.max(0, lessonsPagination.page + dir));
+      renderLessonsPage();
+    }
+    function renderLessonsPage() {
+      const list = document.getElementById("lessons-list");
+      list.replaceChildren();
+      const { page, perPage } = lessonsPagination;
+      const lessons = (dashboardState.lessons?.lessons || []);
+      const total = lessons.length;
+      const start = page * perPage;
+      const slice = lessons.slice(start, start + perPage);
+
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      document.getElementById("lessons-pager-info").textContent = total === 0 ? "" : `${start + 1}–${Math.min(start + perPage, total)} dari ${total}`;
+      document.getElementById("lessons-pager-page").textContent = total === 0 ? "" : `Hal ${page + 1} / ${totalPages}`;
+      document.getElementById("lessons-pager-prev").disabled = page === 0;
+      document.getElementById("lessons-pager-next").disabled = page >= totalPages - 1;
+      document.getElementById("lessons-pager").style.display = total <= perPage ? "none" : "flex";
+
+      if (total === 0) {
+        const div = document.createElement("div");
+        div.style.cssText = "text-align:center;padding:32px;color:var(--text-muted);font-size:12px;background:var(--bg-elevated);border-radius:12px;border:1px solid var(--border-subtle);";
+        div.textContent = "No lessons recorded yet. Close positions to trigger study.";
+        list.appendChild(div);
+      } else {
+        slice.forEach(l => {
+          const item = document.createElement("div");
+          item.className = "lesson-card";
+          item.title = "Klik untuk lihat detail";
+          item.addEventListener("click", () => openLessonDetail(l));
+
+          // click hint
+          const hint = document.createElement("span"); hint.className = "lesson-card-click-hint"; hint.textContent = "detail →";
+
+          const hdr = document.createElement("div"); hdr.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-subtle);";
+          const spanRole = document.createElement("span"); spanRole.style.cssText = "font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:rgba(124,92,255,0.1);color:var(--accent-light);border:1px solid rgba(124,92,255,0.2);flex-shrink:0;"; spanRole.textContent = String(l.role || "all");
+
+          const rightSide = document.createElement("div"); rightSide.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0;";
+          const tagCont = document.createElement("div"); tagCont.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;min-width:0;";
+          (l.tags || []).forEach(t => {
+            const st = document.createElement("span"); st.style.cssText = "font-size:9px;font-weight:600;padding:1px 6px;border-radius:99px;background:var(--bg-base);color:var(--text-muted);border:1px solid var(--border-subtle);white-space:nowrap;"; st.textContent = t;
+            tagCont.appendChild(st);
+          });
+          rightSide.appendChild(tagCont);
+          rightSide.appendChild(hint);
+          hdr.appendChild(spanRole); hdr.appendChild(rightSide);
+
+          const ruleP = document.createElement("p"); ruleP.style.cssText = "font-size:12px;color:var(--text-secondary);line-height:1.6;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;"; ruleP.textContent = l.rule;
+
+          item.appendChild(hdr); item.appendChild(ruleP);
+          list.appendChild(item);
+        });
+      }
+    }
+
+    // Open lesson detail popup
+    function openLessonDetail(l) {
+      const modal   = document.getElementById("lesson-detail-modal");
+      const body    = document.getElementById("lesson-detail-body");
+      const title   = document.getElementById("lesson-detail-title");
+      const subtitle= document.getElementById("lesson-detail-subtitle");
+      const badge   = document.getElementById("lesson-detail-outcome-badge");
+
+      // Clear previous content
+      body.replaceChildren();
+
+      // --- Title & badge ---
+      const isConfigChange = (l.tags || []).some(t => t === "config_change" || t === "self_tune" || t === "evolution");
+      const isPerf = l.sourceType === "performance";
+      const outcome = l.outcome || "manual";
+
+      if (isConfigChange) {
+        title.textContent = (l.tags || []).includes("evolution") ? "Auto-Evolved Config" : "Self-Tuned Config";
+        badge.className = "lesson-outcome-badge config";
+        badge.textContent = "⚙ Config Change";
+      } else if (isPerf) {
+        title.textContent = outcome === "good" ? "✅ Good Trade Lesson" : "❌ Bad Trade Lesson";
+        badge.className = `lesson-outcome-badge ${outcome}`;
+        badge.textContent = outcome === "good" ? "Profitable" : "Loss";
+      } else {
+        title.textContent = "📝 Manual Lesson";
+        badge.className = "lesson-outcome-badge manual";
+        badge.textContent = "Manual";
+      }
+
+      // --- Subtitle: date ---
+      if (l.created_at) {
+        const d = new Date(l.created_at);
+        subtitle.textContent = `Recorded: ${d.toLocaleString("id-ID", { dateStyle:"medium", timeStyle:"short" })}`;
+      } else {
+        subtitle.textContent = "";
+      }
+
+      function makeSection(label, contentEl) {
+        const sec = document.createElement("div");
+        sec.className = "lesson-detail-section";
+        const lbl = document.createElement("div"); lbl.className = "lesson-detail-label"; lbl.textContent = label;
+        sec.appendChild(lbl); sec.appendChild(contentEl);
+        body.appendChild(sec);
+      }
+
+      // --- Rule text ---
+      const ruleDiv = document.createElement("div");
+      ruleDiv.className = "lesson-detail-value";
+      ruleDiv.style.cssText = "background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:8px;padding:12px 14px;line-height:1.7;";
+      ruleDiv.textContent = l.rule || "—";
+      makeSection("Lesson / Rule", ruleDiv);
+
+      // --- Config params (for config_change / self_tune / evolution) ---
+      if (isConfigChange && l.rule) {
+        // Try to parse "Changed key=val, key=val" or "key=val → key2=val2" patterns
+        const changedMatch = l.rule.match(/Changed\s+(.*)/);
+        const evolvedMatch = l.rule.match(/\[AUTO-EVOLVED[^\]]*\]\s+(.*)/);
+        let rawParams = changedMatch ? changedMatch[1] : (evolvedMatch ? evolvedMatch[1] : null);
+
+        if (rawParams) {
+          // Parse "key=val, key=val" format
+          const pairs = rawParams.split(/,\s*/).map(p => p.trim()).filter(Boolean);
+          const paramEntries = [];
+          pairs.forEach(pair => {
+            // handle "key=val → newval" or "key=val"
+            const eqIdx = pair.indexOf("=");
+            if (eqIdx !== -1) {
+              const key = pair.slice(0, eqIdx).trim();
+              let val = pair.slice(eqIdx + 1).trim();
+              // strip trailing descriptors after " —"
+              val = val.split(" —")[0].trim();
+              paramEntries.push({ key, val });
+            } else {
+              // It might be a description line, add as note
+              paramEntries.push({ key: "note", val: pair });
+            }
+          });
+
+          if (paramEntries.length > 0) {
+            const grid = document.createElement("div");
+            grid.className = "lesson-detail-config-grid";
+            paramEntries.forEach(({ key, val }) => {
+              const item = document.createElement("div");
+              item.className = "lesson-detail-config-item";
+              const k = document.createElement("div"); k.className = "lesson-detail-config-key"; k.textContent = key;
+              const v = document.createElement("div"); v.className = "lesson-detail-config-val"; v.textContent = val;
+              item.appendChild(k); item.appendChild(v);
+              grid.appendChild(item);
+            });
+            makeSection("Parameter yang Diubah", grid);
+          }
+        }
+      }
+
+      // --- Performance metrics ---
+      if (isPerf || l.pnl_pct != null) {
+        const metrics = [];
+        if (l.pnl_pct != null) metrics.push({ label: "PnL", val: `${l.pnl_pct >= 0 ? "+" : ""}${l.pnl_pct.toFixed(2)}%`, color: l.pnl_pct >= 0 ? "#22d366" : "#ff6b8a" });
+        if (l.fees_earned_usd != null) metrics.push({ label: "Fees Earned", val: `$${l.fees_earned_usd.toFixed(3)}`, color: "#22d366" });
+        if (l.initial_value_usd != null) metrics.push({ label: "Initial Value", val: `$${l.initial_value_usd.toFixed(2)}`, color: "var(--text-secondary)" });
+        if (l.range_efficiency != null) metrics.push({ label: "Range Efficiency", val: `${l.range_efficiency}%`, color: l.range_efficiency >= 80 ? "#22d366" : "#fbbf24" });
+        if (l.confidence != null) metrics.push({ label: "Confidence", val: `${(l.confidence * 100).toFixed(0)}%`, color: "var(--accent-light)" });
+
+        if (metrics.length > 0) {
+          const metricsGrid = document.createElement("div");
+          metricsGrid.className = "lesson-detail-metrics";
+          metrics.forEach(({ label, val, color }) => {
+            const m = document.createElement("div"); m.className = "lesson-detail-metric";
+            const ml = document.createElement("div"); ml.className = "lesson-detail-metric-label"; ml.textContent = label;
+            const mv = document.createElement("div"); mv.className = "lesson-detail-metric-val"; mv.style.color = color; mv.textContent = val;
+            m.appendChild(ml); m.appendChild(mv);
+            metricsGrid.appendChild(m);
+          });
+          makeSection("Performance Metrics", metricsGrid);
+        }
+      }
+
+      // --- Close reason ---
+      if (l.close_reason) {
+        const cr = document.createElement("div"); cr.className = "lesson-detail-value";
+        cr.textContent = l.close_reason;
+        makeSection("Close Reason", cr);
+      }
+
+      // --- Entry / Exit data ---
+      const hasEntryExit = l.entry_mcap || l.entry_tvl || l.entry_volume || l.exit_mcap || l.exit_tvl || l.exit_volume;
+      if (hasEntryExit) {
+        const fmt = (v, prefix="") => v != null ? `${prefix}${v >= 1e6 ? (v/1e6).toFixed(2)+"M" : v >= 1e3 ? (v/1e3).toFixed(1)+"K" : v.toFixed(0)}` : "—";
+        const table = document.createElement("div");
+        table.style.cssText = "display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;";
+
+        const cols = [
+          { key: "MCap", entry: fmt(l.entry_mcap, "$"), exit: fmt(l.exit_mcap, "$") },
+          { key: "TVL",  entry: fmt(l.entry_tvl, "$"),  exit: fmt(l.exit_tvl, "$") },
+          { key: "Volume", entry: fmt(l.entry_volume, "$"), exit: fmt(l.exit_volume, "$") },
+        ];
+        cols.forEach(({ key, entry, exit }) => {
+          const cell = document.createElement("div");
+          cell.style.cssText = "background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;";
+          cell.innerHTML = `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;font-weight:700;">${key}</div>
+            <div style="font-size:11px;color:var(--text-secondary);">Entry: <span style="color:var(--text-primary);font-weight:600;">${entry}</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);">Exit: <span style="color:var(--text-primary);font-weight:600;">${exit}</span></div>`;
+          table.appendChild(cell);
+        });
+        makeSection("Entry → Exit Data", table);
+      }
+
+      // --- Pool address ---
+      if (l.pool) {
+        const poolDiv = document.createElement("div");
+        poolDiv.style.cssText = "font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--accent-light);word-break:break-all;background:var(--bg-base);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 12px;";
+        poolDiv.textContent = l.pool;
+        makeSection("Pool Address", poolDiv);
+      }
+
+      // --- Context string ---
+      if (l.context) {
+        const ctx = document.createElement("div"); ctx.className = "lesson-detail-context";
+        ctx.textContent = l.context;
+        makeSection("Context Detail", ctx);
+      }
+
+      // --- Tags ---
+      if (l.tags && l.tags.length > 0) {
+        const tagsDiv = document.createElement("div");
+        l.tags.forEach(t => {
+          const span = document.createElement("span"); span.className = "lesson-detail-tag"; span.textContent = t;
+          tagsDiv.appendChild(span);
+        });
+        makeSection("Tags", tagsDiv);
+      }
+
+      // --- Role ---
+      if (l.role) {
+        const roleDiv = document.createElement("div"); roleDiv.className = "lesson-detail-value";
+        roleDiv.textContent = l.role;
+        makeSection("Target Role", roleDiv);
+      }
+
+      modal.showModal();
     }
 
     // Add lesson
