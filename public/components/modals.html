@@ -1,0 +1,116 @@
+<!-- Hidden icon templates -->
+  <div style="display:none;">
+    <div id="tmpl-icon-deploy"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(16,217,160,0.15);flex-shrink:0;">🚀</span></div>
+    <div id="tmpl-icon-close"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(255,77,109,0.15);flex-shrink:0;">💥</span></div>
+    <div id="tmpl-icon-skip"><span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(100,80,255,0.1);flex-shrink:0;">🛡️</span></div>
+  </div>
+
+  <!-- Deploy Modal -->
+  <dialog id="deploy-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Deploy LP Position</div>
+      <div class="modal-subtitle">Allocate liquidity manually into the chosen Meteora pool.</div>
+    </div>
+    <form id="deploy-form">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <input type="hidden" id="deploy-pool-address">
+        <div class="form-group">
+          <label class="form-label">Pool Name</label>
+          <input type="text" id="deploy-pool-name" class="form-input" readonly style="opacity:0.6;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">LP Deposit Size (SOL)</label>
+          <input type="number" step="0.05" id="deploy-amount" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bins Below Active Bin</label>
+          <input type="number" step="1" id="deploy-bins-below" class="form-input" required>
+        </div>
+        <div id="deploy-error" style="display:none;font-size:12px;color:#ff6b8a;background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);border-radius:8px;padding:10px 12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('deploy-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" id="btn-submit-deploy" class="btn-primary">Deploy Position</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Position Note Modal -->
+  <dialog id="position-note-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Set Custom Position Instruction</div>
+      <div class="modal-subtitle">Inject a condition the management cycle will act upon autonomously.</div>
+    </div>
+    <form id="position-note-form">
+      <div class="modal-body">
+        <input type="hidden" id="note-position-address">
+        <div class="form-group">
+          <label class="form-label">Instruction Note</label>
+          <textarea id="note-text" class="form-input" style="height:96px;resize:vertical;" placeholder="e.g. Sell if token hits $1.50 or if fees earned reach 2%"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('position-note-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save Instruction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Add Lesson Modal -->
+  <dialog id="add-lesson-modal" class="meridian-modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Manual Agent Lesson</div>
+      <div class="modal-subtitle">Manually record a lesson. Injected into prompt contexts for screener and manager.</div>
+    </div>
+    <form id="add-lesson-form">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label class="form-label">Lesson / Rule Text</label>
+          <textarea id="lesson-rule-text" class="form-input" style="height:96px;resize:vertical;" placeholder="e.g. Avoid deploying into token pairs that have less than $5,000 all-time volume" required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags (comma-separated)</label>
+          <input type="text" id="lesson-tags" class="form-input" placeholder="screener, risk, pumpfun">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="document.getElementById('add-lesson-modal').close()" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save Lesson</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Lesson Detail Popup Modal -->
+  <dialog id="lesson-detail-modal" class="meridian-modal">
+    <div class="modal-header" id="lesson-detail-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="modal-title" id="lesson-detail-title">Lesson Detail</div>
+        <span id="lesson-detail-outcome-badge"></span>
+      </div>
+      <div class="modal-subtitle" id="lesson-detail-subtitle"></div>
+    </div>
+    <div class="modal-body" id="lesson-detail-body" style="display:flex;flex-direction:column;gap:0;max-height:70vh;overflow-y:auto;">
+      <!-- Dynamically populated -->
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="document.getElementById('lesson-detail-modal').close()" class="btn-ghost">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Close Confirm Modal -->
+  <dialog id="close-confirm-modal" class="meridian-modal">
+    <div class="modal-header" style="border-color:rgba(255,77,109,0.2);">
+      <div class="modal-title" style="color:#ff6b8a;">Close LP Position</div>
+      <div class="modal-subtitle">This will trigger on-chain withdrawal and swap assets back to SOL.</div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-secondary);background:rgba(255,77,109,0.06);border:1px solid rgba(255,77,109,0.15);border-radius:10px;padding:14px 16px;line-height:1.6;">
+        Are you sure you want to <strong style="color:var(--text-primary);">CLOSE</strong> the position in
+        <strong style="color:#fff;" id="close-confirm-pair"></strong>?
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="document.getElementById('close-confirm-modal').close()" class="btn-ghost">Cancel</button>
+      <button type="button" id="btn-confirm-close" class="btn-danger">Yes, Close Position</button>
+    </div>
+  </dialog>

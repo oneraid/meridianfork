@@ -11,6 +11,7 @@ import { log } from "./logger.js";
 import { REPO_ROOT, repoPath } from "./repo-root.js";
 import { getTrackedPositions, recordPortfolioSnapshot, getPortfolioHistory } from "./state.js";
 import { Connection } from "@solana/web3.js";
+import { listStrategies, setActiveStrategy } from "./strategy-library.js";
 
 let apiStatusCache = null;
 let apiStatusCacheTime = 0;
@@ -476,6 +477,32 @@ export function startDashboardServer(context = {}) {
     }
   });
 
+  // ─── Strategy Manager API ─────────────────────────────────────
+
+  // List all strategies with active status
+  app.get("/api/strategies", requireAuth, (req, res) => {
+    try {
+      const result = listStrategies();
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Set which strategy is active
+  app.post("/api/strategies/activate", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) return res.status(400).json({ error: "Strategy id required" });
+      const result = setActiveStrategy({ id });
+      if (result.error) return res.status(404).json(result);
+      log("dashboard", `Strategy activated via Web UI: ${id}`);
+      res.json({ success: true, active: id, name: result.name });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/control/run-management", requireAuth, requireCsrf, (req, res) => {
     if (context.runManagementCycle) {
       log("dashboard", "Manual management cycle triggered via Web UI");
@@ -502,12 +529,38 @@ export function startDashboardServer(context = {}) {
     }
   });
 
+  const renderIndexHtml = (req, res) => {
+    try {
+      const templatePath = path.join(REPO_ROOT, "public", "index.template.html");
+      let html = fs.readFileSync(templatePath, "utf8");
+      
+      const components = ["sidebar", "dashboard", "positions", "decisions", "lessons", "config", "modals"];
+      for (const comp of components) {
+        const compPath = path.join(REPO_ROOT, "public", "components", `${comp}.html`);
+        if (fs.existsSync(compPath)) {
+          const compHtml = fs.readFileSync(compPath, "utf8");
+          html = html.replace(`{{${comp}}}`, compHtml);
+        }
+      }
+      res.send(html);
+    } catch (e) {
+      log("dashboard_error", `Failed to render index template: ${e.message}`);
+      res.status(500).send("Error rendering dashboard: " + e.message);
+    }
+  };
+
+  // Handle root and index.html routes dynamically with templating
+  app.get(["/", "/index.html"], renderIndexHtml);
+
   // Serve static files from /public
   app.use(express.static(path.join(REPO_ROOT, "public")));
 
-  // Fallback to SPA index.html for undefined HTML routes
+  // Fallback to SPA dynamic rendering for undefined HTML routes
   app.get("*", (req, res) => {
-    res.sendFile(path.join(REPO_ROOT, "public", "index.html"));
+    if (path.extname(req.path)) {
+      return res.status(404).end();
+    }
+    renderIndexHtml(req, res);
   });
 
   // Start Server

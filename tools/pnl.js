@@ -236,6 +236,7 @@ function buildPosition(f, prices, solUsd, meteora, solMode) {
     minutes_out_of_range: minutesOutOfRange(f.position),
     instruction:        tracked?.instruction ?? null,
     bin_step:           f.binStep ?? 100,
+    strategy:           tracked?.strategy ?? null,
     decimal_multiplier: f.decimalMultiplier ?? 1,
   };
 }

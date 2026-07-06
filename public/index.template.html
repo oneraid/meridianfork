@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meridian — Autonomous DLMM LP Agent</title>
+  <meta name="description" content="Meridian autonomous liquidity management agent dashboard for Meteora DLMM pools on Solana.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS & DaisyUI CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            heading: ['Space Grotesk', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- ════════════════ LOGIN PAGE ════════════════ -->
+  <div id="login-page">
+    <div class="login-card">
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px;">
+        <div class="logo-icon" style="width:52px;height:52px;border-radius:16px;margin-bottom:16px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918"/>
+          </svg>
+        </div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;background:linear-gradient(135deg,#fff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:0.04em;">MERIDIAN</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;text-align:center;">Autonomous DLMM Liquidity Agent</div>
+      </div>
+
+      <form id="login-form" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="form-group">
+          <label class="form-label">Dashboard Password</label>
+          <input type="password" id="password-input" class="form-input" placeholder="Enter your access key" required style="font-size:15px;padding:12px 14px;letter-spacing:0.1em;">
+        </div>
+
+        <div id="login-error" style="display:none;font-size:12px;color:#ff6b8a;background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.2);border-radius:8px;padding:10px 12px;font-weight:500;">
+          Invalid credentials. Please check your password.
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px;margin-top:4px;">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Unlock Console
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════ MAIN APP SHELL ════════════════ -->
+  <div id="app-shell" style="display:none;">
+
+    <!-- SIDEBAR -->
+{{sidebar}}
+    <!-- MAIN AREA -->
+    <div id="main-area">
+
+      <!-- TOP BAR -->
+      <header id="top-bar">
+        <div class="top-bar-left">
+          <div class="view-title" id="view-title">Overview</div>
+          <div class="view-subtitle">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.8;" class="ping-dot"></span>
+            <span id="countdown-text">Loading agent timers...</span>
+          </div>
+        </div>
+        <div class="top-bar-actions">
+          <button onclick="triggerQuickAction('screen')" class="btn-ghost btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="topbar-label">Run Screening</span>
+          </button>
+          <button onclick="triggerQuickAction('manage')" class="btn-ghost btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span class="topbar-label">Run Management</span>
+          </button>
+          <button onclick="toggleCronState()" id="btn-toggle-cron" class="btn-danger btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="topbar-label">Pause Agent</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTENT -->
+      <div id="content-area">
+
+        <!-- ── TAB: DASHBOARD OVERVIEW ── -->
+        {{dashboard}}
+        <!-- ── TAB: LP POSITIONS ── -->
+        {{positions}}
+        <!-- ── TAB: DECISIONS LOG ── -->
+        {{decisions}}
+        <!-- ── TAB: LESSONS & PERFORMANCE ── -->
+        {{lessons}}
+        <!-- ── TAB: CONFIGURATION ── -->
+        {{config}}
+      </div><!-- /content-area -->
+    </div><!-- /main-area -->
+  </div><!-- /app-shell -->
+
+  <!-- ════════════════ MOBILE BOTTOM NAV ════════════════ -->
+  <!-- Backdrop to close "more" menu -->
+  <div id="more-backdrop" onclick="closeMoreMenu()"></div>
+
+  <!-- More popup menu (lessons, config, logout) -->
+  <div id="more-menu">
+    <button class="more-menu-item" id="more-btn-lessons" onclick="moreNav('lessons')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      Lessons & Performance
+    </button>
+    <button class="more-menu-item" id="more-btn-config" onclick="moreNav('config')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Configuration
+    </button>
+    <div style="height:1px;background:var(--border-subtle);margin:6px 8px;"></div>
+    <button class="more-menu-item" onclick="handleLogout();closeMoreMenu();" style="color:#ff6b8a;">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Lock Console
+    </button>
+  </div>
+
+  <!-- Bottom Nav Bar -->
+  <nav id="bottom-nav">
+    <button class="bottom-nav-item active" id="bnav-dashboard" onclick="switchTab('dashboard');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"/></svg>
+      Home
+    </button>
+    <button class="bottom-nav-item" id="bnav-positions" onclick="switchTab('positions');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      Positions
+    </button>
+    <button class="bottom-nav-item" id="bnav-decisions" onclick="switchTab('decisions');closeMobileMenu();">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Logs
+    </button>
+    <button class="bottom-nav-item" id="bnav-more" onclick="toggleMoreMenu()">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+      More
+    </button>
+  </nav>
+
+
+{{modals}}
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- ════════════════ CLIENT LOGIC ════════════════ -->
+  <script src="/js/utils.js" defer></script>
+  <script src="/js/dashboard.js" defer></script>
+  <script src="/js/positions.js" defer></script>
+  <script src="/js/decisions.js" defer></script>
+  <script src="/js/lessons.js" defer></script>
+  <script src="/js/config.js" defer></script>
+  <script src="/js/app.js" defer></script>
+</body>
+</html>
+

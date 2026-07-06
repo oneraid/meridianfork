@@ -1,0 +1,313 @@
+<div id="view-config" style="display:none;">
+          <div class="section-header" style="margin-bottom:20px;">
+            <div class="section-title">
+              <div class="section-dot"></div>
+              Configuration Panel
+            </div>
+            <button onclick="saveConfiguration()" class="btn-primary btn-sm">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              Save Settings
+            </button>
+          </div>
+
+          <form id="config-form" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <!-- Risk & Capital -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                Risk & Capital Allocation
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div class="form-group">
+                  <label class="form-label">Base SOL per Position</label>
+                  <input type="number" step="0.05" id="cfg-deployAmountSol" class="form-input">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min SOL to Open</label>
+                    <input type="number" step="0.05" id="cfg-minSolToOpen" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Gas Reserve (SOL)</label>
+                    <input type="number" step="0.01" id="cfg-gasReserve" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Max Open Positions</label>
+                    <input type="number" step="1" id="cfg-maxPositions" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max SOL Cap per Position</label>
+                    <input type="number" step="1" id="cfg-maxDeployAmount" class="form-input">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+                  <input type="checkbox" id="cfg-solMode" class="form-checkbox">
+                  <label for="cfg-solMode" class="form-label" style="cursor:pointer;margin:0;">SOL Mode Display</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Exit Rules -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                Exit Rules & Trailing Take Profit
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Take Profit (%)</label>
+                    <input type="number" step="0.5" id="cfg-takeProfitPct" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Stop Loss (%)</label>
+                    <input type="number" step="0.5" id="cfg-stopLossPct" class="form-input">
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
+                  <input type="checkbox" id="cfg-trailingTakeProfit" class="form-checkbox">
+                  <label for="cfg-trailingTakeProfit" class="form-label" style="cursor:pointer;margin:0;">Enable Trailing Take Profit</label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Trailing Trigger (%)</label>
+                    <input type="number" step="0.1" id="cfg-trailingTriggerPct" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Trailing Drop (%)</label>
+                    <input type="number" step="0.1" id="cfg-trailingDropPct" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">OOR Bin Limit</label>
+                    <input type="number" step="1" id="cfg-outOfRangeBinsToClose" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">OOR Wait Minutes</label>
+                    <input type="number" step="1" id="cfg-outOfRangeWaitMinutes" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Yield / TVL 24h (%)</label>
+                    <input type="number" step="1" id="cfg-minFeePerTvl24h" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Yield Check Cooldown (min)</label>
+                    <input type="number" step="1" id="cfg-minAgeBeforeYieldCheck" class="form-input">
+                  </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">PnL Confirm Ticks</label>
+                    <input type="number" step="1" id="cfg-pnlConfirmTicks" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Auto-Swap Retries</label>
+                    <input type="number" step="1" id="cfg-autoSwapRetryAttempts" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Auto-Swap Delay (ms)</label>
+                    <input type="number" step="100" id="cfg-autoSwapRetryDelayMs" class="form-input">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Screener Criteria -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                Screener Criteria
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Candle Timeframe</label>
+                    <select id="cfg-timeframe" class="form-input">
+                      <option value="5m">5m</option>
+                      <option value="30m">30m</option>
+                      <option value="1h">1h</option>
+                      <option value="2h">2h</option>
+                      <option value="4h">4h</option>
+                      <option value="24h">24h</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Min 24h Volume (USD)</label>
+                    <input type="number" step="100" id="cfg-minVolume" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min fee/active-TVL ratio (%)</label>
+                    <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Lone Candidate Min Degen</label>
+                    <input type="number" step="1" id="cfg-loneCandidateMinDegen" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min TVL (USD)</label>
+                    <input type="number" step="5000" id="cfg-minTvl" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max TVL (USD)</label>
+                    <input type="number" step="5000" id="cfg-maxTvl" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Mcap (USD)</label>
+                    <input type="number" step="5000" id="cfg-minMcap" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Mcap (USD)</label>
+                    <input type="number" step="5000" id="cfg-maxMcap" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Organic Score</label>
+                    <input type="number" step="1" id="cfg-minOrganic" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Min Token Holders</label>
+                    <input type="number" step="50" id="cfg-minHolders" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Bin Step</label>
+                    <input type="number" step="1" id="cfg-minBinStep" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Bin Step</label>
+                    <input type="number" step="1" id="cfg-maxBinStep" class="form-input">
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Bins Below</label>
+                    <input type="number" step="1" id="cfg-minBinsBelow" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Bins Below</label>
+                    <input type="number" step="1" id="cfg-maxBinsBelow" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Default Bins</label>
+                    <input type="number" step="1" id="cfg-defaultBinsBelow" class="form-input">
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+                  <div class="form-group">
+                    <label class="form-label">Active Library Strategy</label>
+                    <select id="cfg-activeStrategyId" class="form-input"></select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">DLMM Strategy Shape</label>
+                    <select id="cfg-strategy" class="form-input">
+                      <option value="bid_ask">Bid-Ask</option>
+                      <option value="spot">Spot</option>
+                      <option value="curve">Curve</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opportunity Poller & Degen Score Calibration -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Opportunity Poller & Degen Score Calibration
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
+                  <input type="checkbox" id="cfg-opportunityPollEnabled" class="form-checkbox">
+                  <label for="cfg-opportunityPollEnabled" class="form-label" style="cursor:pointer;margin:0;">Enable Opportunity Poller</label>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Poll Interval (sec)</label>
+                    <input type="number" step="1" id="cfg-opportunityPollIntervalSec" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Poll Limit (pools)</label>
+                    <input type="number" step="1" id="cfg-opportunityPollLimit" class="form-input">
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Min Degen Score to Deploy</label>
+                    <input type="number" step="1" id="cfg-opportunityMinScore" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Smart Wallet Bonus Score</label>
+                    <input type="number" step="1" id="cfg-opportunitySmartWalletBonus" class="form-input">
+                  </div>
+                </div>
+                
+                <div style="margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
+                  <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Degen Score Targets (30m normalized)</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                       <label class="form-label">Target Vol/Tvl Ratio</label>
+                       <input type="number" step="1" id="cfg-degenTargetVolRatio" class="form-input">
+                    </div>
+                    <div class="form-group">
+                       <label class="form-label">Target LP Count</label>
+                       <input type="number" step="1" id="cfg-degenTargetLpCount" class="form-input">
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                    <div class="form-group">
+                       <label class="form-label">Target Fee/Tvl Ratio</label>
+                       <input type="number" step="0.05" id="cfg-degenTargetFeeRatio" class="form-input">
+                    </div>
+                    <div class="form-group">
+                       <label class="form-label">Target Liquidity (USD)</label>
+                       <input type="number" step="1000" id="cfg-degenTargetLiquidity" class="form-input">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Schedule & LLM -->
+            <div class="cfg-section">
+              <div class="cfg-section-title">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                Schedule Intervals & LLM Models
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div class="form-group">
+                    <label class="form-label">Management Cycle (min)</label>
+                    <input type="number" step="1" id="cfg-managementIntervalMin" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Screening Cycle (min)</label>
+                    <input type="number" step="1" id="cfg-screeningIntervalMin" class="form-input">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Screening LLM Model</label>
+                  <input type="text" id="cfg-screeningModel" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Management LLM Model</label>
+                  <input type="text" id="cfg-managementModel" class="form-input">
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>

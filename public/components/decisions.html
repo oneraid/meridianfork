@@ -1,0 +1,63 @@
+<div id="view-decisions" style="display:none;">
+          <!-- Screened Candidate Pools -->
+          <div class="section-header">
+            <div>
+              <div class="section-title" style="margin-bottom:4px;">
+                <div class="section-dot"></div>
+                Screened Candidate Pools
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);">Top-scoring Meteora DLMM pools matching configuration filters</div>
+            </div>
+            <button onclick="triggerScreening()" id="btn-trigger-screen" class="btn-primary btn-sm">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh Candidates
+            </button>
+          </div>
+          <div class="panel" style="overflow:hidden; margin-bottom:32px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pool Details</th>
+                  <th>Fee / Active TVL</th>
+                  <th>Volume / TVL</th>
+                  <th>Organic Score</th>
+                  <th>Volatility</th>
+                  <th>Deploy</th>
+                </tr>
+              </thead>
+              <tbody id="screener-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Agent Decision Log -->
+          <div class="section-header" style="margin-bottom:16px;">
+            <div>
+              <div class="section-title" style="margin-bottom:4px;">
+                <div class="section-dot"></div>
+                Agent Decision Log
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);">Structured audit trail of all agent operations</div>
+            </div>
+          </div>
+          <div class="panel" style="overflow:hidden; margin-bottom:8px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action Type</th>
+                  <th>Summary</th>
+                  <th>Decision / Reason</th>
+                </tr>
+              </thead>
+              <tbody id="decisions-table-body"></tbody>
+            </table>
+          </div>
+          <div class="pager" id="decisions-pager">
+            <span class="pager-info" id="decisions-pager-info"></span>
+            <div class="pager-controls">
+              <button class="pager-btn" id="decisions-pager-prev" onclick="decisionsPage(-1)">← Prev</button>
+              <span class="pager-page" id="decisions-pager-page"></span>
+              <button class="pager-btn" id="decisions-pager-next" onclick="decisionsPage(1)">Next →</button>
+            </div>
+          </div>
+        </div>

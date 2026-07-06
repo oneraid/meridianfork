@@ -1,0 +1,119 @@
+<div id="view-dashboard">
+
+          <!-- Metric Cards -->
+          <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+            <div class="metric-card accent-purple">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Wallet Balance</span>
+                <div class="metric-icon" style="background:rgba(124,92,255,0.12);color:var(--accent-light);">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-wallet-sol">--</span></div>
+              <div class="metric-sub" id="metric-wallet-usd">SOL — calculating USD...</div>
+            </div>
+            <div class="metric-card accent-blue">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Active Positions</span>
+                <div class="metric-icon" style="background:rgba(59,130,246,0.12);color:#60a5fa;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-positions-count">--</span> <span id="metric-positions-max" style="font-size:14px;color:var(--text-secondary);font-weight:500;">/ --</span></div>
+              <div class="metric-sub">Open liquidity slots</div>
+            </div>
+            <div class="metric-card accent-rose">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <span class="metric-label">Winrate (W / L)</span>
+                <div class="metric-icon" style="background:rgba(244,63,94,0.12);color:#fb7185;">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value"><span id="metric-winrate-pct">--</span></div>
+              <div class="metric-sub" id="metric-winrate-count">W: -- / L: --</div>
+            </div>
+          </div>
+
+          <!-- Portfolio Trend Line Chart -->
+          <div class="panel" style="margin-bottom: 24px; padding: 20px; position: relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div class="section-dot" style="background:var(--accent-light);"></div>
+                  <span style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.05em;">SOL Balance Trend</span>
+                </div>
+                <!-- Timeframe Toggles -->
+                <div class="timeframe-toggles" style="display:flex; background:rgba(255,255,255,0.05); border-radius:6px; padding:2px; border:1px solid rgba(255,255,255,0.08);">
+                  <button type="button" class="tf-btn" id="tf-1d" onclick="setChartTimeframe('1D')" style="background:none; border:none; color:var(--text-muted); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">1D</button>
+                  <button type="button" class="tf-btn" id="tf-7d" onclick="setChartTimeframe('7D')" style="background:var(--accent-light); border:none; color:#fff; font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">7D</button>
+                  <button type="button" class="tf-btn" id="tf-30d" onclick="setChartTimeframe('30D')" style="background:none; border:none; color:var(--text-muted); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">30D</button>
+                </div>
+              </div>
+              <span id="chart-current-value" style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:#fff; text-align:right;">
+                -- SOL
+              </span>
+            </div>
+            <div id="portfolio-chart-container" style="width:100%; height:200px; position:relative;">
+              <!-- Responsive SVG Chart will be injected here -->
+            </div>
+          </div>
+
+          <!-- Split Grid -->
+          <div class="dashboard-split" style="display:grid;grid-template-columns:1fr 340px;gap:20px;">
+            <!-- Open Positions -->
+            <div>
+              <div class="section-header">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Open LP Positions
+                </div>
+                <button onclick="switchTab('positions')" style="font-size:12px;color:var(--accent-light);font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                  View All
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+              <div id="dashboard-positions-list" class="positions-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;"></div>
+            </div>
+
+            <!-- Recent Action Feed -->
+            <div>
+              <div class="section-header">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Recent Actions
+                </div>
+                <button onclick="switchTab('decisions')" style="font-size:12px;color:var(--accent-light);font-weight:600;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                  Full Log
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+              <div id="dashboard-decisions-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;"></div>
+
+              <!-- System Connection Sidebar Panel -->
+              <div class="section-header">
+                <div class="section-title">
+                  <div class="section-dot" style="background:#fbbf24;"></div>
+                  System Connection
+                </div>
+              </div>
+              <div class="panel" style="padding:16px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:11px; display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">Solana RPC</span>
+                  <span id="status-rpc">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">Helius API</span>
+                  <span id="status-helius">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">TG Bot</span>
+                  <span id="status-telegram">--</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;">LLM API</span>
+                  <span id="status-llm">--</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>

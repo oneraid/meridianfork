@@ -1,0 +1,46 @@
+<div id="view-positions" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">
+              <div class="section-dot"></div>
+              Managed Liquidity Positions
+            </div>
+            <span id="positions-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(124,92,255,0.1);color:var(--accent-light);border:1px solid rgba(124,92,255,0.25);">-- Positions</span>
+          </div>
+          <div id="positions-list" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:16px;margin-bottom:24px;">
+            <div style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;background:var(--bg-surface);border-radius:16px;border:1px solid var(--border-subtle);">
+              Loading positions data...
+            </div>
+          </div>
+
+          <!-- Closed Positions History -->
+          <div class="section-header" style="margin-top: 32px;">
+            <div class="section-title">
+              <div class="section-dot" style="background: var(--text-muted);"></div>
+              Closed Positions History
+            </div>
+            <span id="positions-history-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">-- Closed</span>
+          </div>
+          <div class="panel" style="overflow-x:auto; margin-bottom:8px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pair / Address</th>
+                  <th>Initial SOL</th>
+                  <th>Closed PnL</th>
+                  <th>Total Fees</th>
+                  <th>Timeline / Duration</th>
+                  <th>Close Reason</th>
+                </tr>
+              </thead>
+              <tbody id="positions-history-table-body"></tbody>
+            </table>
+          </div>
+          <div class="pager" id="history-pager" style="margin-bottom:32px;">
+            <span class="pager-info" id="history-pager-info"></span>
+            <div class="pager-controls">
+              <button class="pager-btn" id="history-pager-prev" onclick="historyPage(-1)">← Prev</button>
+              <span class="pager-page" id="history-pager-page"></span>
+              <button class="pager-btn" id="history-pager-next" onclick="historyPage(1)">Next →</button>
+            </div>
+          </div>
+        </div>

@@ -1359,6 +1359,7 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
           minutes_out_of_range: minutesOutOfRange(positionAddress),
           instruction:        tracked?.instruction ?? null,
           bin_step:           tracked?.bin_step ?? binData?.binStep ?? null,
+          strategy:           tracked?.strategy ?? null,
           decimal_multiplier: decimalMultiplier,
         });
       }

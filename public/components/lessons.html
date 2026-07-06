@@ -1,0 +1,68 @@
+<div id="view-lessons" style="display:none;">
+
+          <!-- Perf Summary Cards -->
+          <div class="perf-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+            <div class="metric-card accent-purple">
+              <div class="metric-label">Closed Positions</div>
+              <div class="metric-value" id="perf-closed-count">--</div>
+            </div>
+            <div class="metric-card accent-green">
+              <div class="metric-label">Win Rate</div>
+              <div class="metric-value" id="perf-win-rate">--</div>
+            </div>
+            <div class="metric-card accent-blue">
+              <div class="metric-label">Avg Closed PnL</div>
+              <div class="metric-value" id="perf-avg-pnl">--</div>
+            </div>
+          </div>
+
+          <div class="lessons-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <!-- Lessons -->
+            <div>
+              <div class="section-header" style="margin-bottom:14px;">
+                <div class="section-title">
+                  <div class="section-dot"></div>
+                  Lessons Learned
+                </div>
+                <button onclick="document.getElementById('add-lesson-modal').showModal()" class="btn-primary btn-xs">Add Lesson</button>
+              </div>
+              <div id="lessons-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+              <div class="pager" id="lessons-pager">
+                <span class="pager-info" id="lessons-pager-info"></span>
+                <div class="pager-controls">
+                  <button class="pager-btn" id="lessons-pager-prev" onclick="lessonsPage(-1)">← Prev</button>
+                  <span class="pager-page" id="lessons-pager-page"></span>
+                  <button class="pager-btn" id="lessons-pager-next" onclick="lessonsPage(1)">Next →</button>
+                </div>
+              </div>
+            </div>
+            <!-- Performance table -->
+            <div>
+              <div class="section-title" style="margin-bottom:14px;">
+                <div class="section-dot"></div>
+                Closed Positions Performance
+              </div>
+              <div class="panel" style="overflow:hidden;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Pool</th>
+                      <th>Hold Time</th>
+                      <th>Close Reason</th>
+                      <th>PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lessons-perf-table-body"></tbody>
+                </table>
+              </div>
+              <div class="pager" id="perf-pager">
+                <span class="pager-info" id="perf-pager-info"></span>
+                <div class="pager-controls">
+                  <button class="pager-btn" id="perf-pager-prev" onclick="perfPage(-1)">← Prev</button>
+                  <span class="pager-page" id="perf-pager-page"></span>
+                  <button class="pager-btn" id="perf-pager-next" onclick="perfPage(1)">Next →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>

@@ -1,0 +1,75 @@
+<aside id="sidebar">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-title">MERIDIAN</div>
+          <div class="logo-sub">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--success);" class="pulse-dot"></span>
+            SYSTEM ACTIVE
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="nav-section">
+        <div class="nav-label">Navigation</div>
+        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="nav-item active">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"/></svg>
+          Overview
+        </button>
+        <button onclick="switchTab('positions')" id="tab-btn-positions" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          LP Positions
+        </button>
+        <button onclick="switchTab('decisions')" id="tab-btn-decisions" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Decisions & Logs
+        </button>
+        <button onclick="switchTab('lessons')" id="tab-btn-lessons" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          Lessons & Performance
+        </button>
+        <button onclick="switchTab('config')" id="tab-btn-config" class="nav-item">
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Configuration
+        </button>
+      </nav>
+
+      <!-- Wallet Card -->
+      <div class="wallet-card-wrap">
+        <div class="wallet-card">
+          <div class="wallet-label">Solana Wallet</div>
+          <div class="wallet-sol"><span id="sidebar-wallet-sol">--</span> <span style="font-size:11px;font-weight:600;color:var(--accent-light);">SOL</span></div>
+          <div class="wallet-usd" id="sidebar-wallet-usd">Loading...</div>
+          <div class="wallet-footer">
+            <span style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono';letter-spacing:0.05em;">ACTIVE NODE</span>
+            <svg style="width:18px;height:18px;color:rgba(124,92,255,0.5);" viewBox="0 0 397 311" fill="currentColor">
+              <path d="M64.6 237.9c-2.4-2.4-5.7-3.8-9.2-3.8H9.2c-5.1 0-9.2 4.1-9.2 9.2v53.9c0 5.1 4.1 9.2 9.2 9.2h323.8c3.5 0 6.8-1.4 9.2-3.8l51-51c2.4-2.4 3.8-5.7 3.8-9.2v-53.9c0-5.1-4.1-9.2-9.2-9.2H73.8c-3.5 0-6.8 1.4-9.2 3.8l-51 51z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span class="status-label">Cron Tasks</span>
+          <span id="cron-status-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,217,160,0.12);color:var(--success);border:1px solid rgba(16,217,160,0.25);">ON</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Relay Server</span>
+          <span id="relay-status-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(100,80,255,0.07);color:var(--text-muted);border:1px solid var(--border-subtle);">OFF</span>
+        </div>
+        <div style="margin-top:10px;">
+          <button onclick="handleLogout()" class="btn-ghost" style="width:100%;justify-content:center;font-size:12px;color:#ff6b8a;border-color:rgba(255,77,109,0.2);">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            Lock Console
+          </button>
+        </div>
+      </div>
+    </aside>
