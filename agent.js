@@ -4,7 +4,7 @@ import { buildSystemPrompt } from "./prompt.js";
 import { executeTool } from "./tools/executor.js";
 import { tools } from "./tools/definitions.js";
 
-const MANAGER_TOOLS  = new Set(["close_position", "claim_fees", "swap_token", "get_position_pnl", "get_my_positions", "get_wallet_balance"]);
+const MANAGER_TOOLS = new Set(["close_position", "claim_fees", "swap_token", "get_position_pnl", "get_my_positions", "get_wallet_balance"]);
 const SCREENER_TOOLS = new Set(["deploy_position", "get_active_bin", "get_top_candidates", "check_smart_wallets_on_pool", "get_token_holders", "get_token_narrative", "get_token_info", "search_pools", "get_pool_memory", "get_wallet_balance", "get_my_positions"]);
 const GENERAL_INTENT_ONLY_TOOLS = new Set([
   "self_update",
@@ -28,47 +28,47 @@ const GENERAL_INTENT_ONLY_TOOLS = new Set([
 
 // Intent → tool subsets for GENERAL role
 const INTENT_TOOLS = {
-  decisions:   new Set(["get_recent_decisions"]),
-  deploy:      new Set(["deploy_position", "get_top_candidates", "get_active_bin", "get_pool_memory", "check_smart_wallets_on_pool", "get_token_holders", "get_token_narrative", "get_token_info", "search_pools", "get_wallet_balance", "get_my_positions", "add_pool_note"]),
-  close:       new Set(["close_position", "get_my_positions", "get_position_pnl", "get_wallet_balance", "swap_token"]),
-  claim:       new Set(["claim_fees", "get_my_positions", "get_position_pnl", "get_wallet_balance"]),
-  swap:        new Set(["swap_token", "get_wallet_balance"]),
-  config:      new Set(["update_config"]),
-  blocklist:   new Set(["add_to_blacklist", "remove_from_blacklist", "list_blacklist", "block_deployer", "unblock_deployer", "list_blocked_deployers"]),
-  selfupdate:  new Set(["self_update"]),
-  balance:     new Set(["get_wallet_balance", "get_my_positions", "get_wallet_positions"]),
-  positions:   new Set(["get_my_positions", "get_position_pnl", "get_wallet_balance", "set_position_note", "get_wallet_positions"]),
-  strategy:    new Set(["list_strategies", "get_strategy", "add_strategy", "update_strategy", "delete_strategy", "remove_strategy", "set_active_strategy"]),
-  screen:      new Set(["get_top_candidates", "get_token_holders", "get_token_narrative", "get_token_info", "search_pools", "check_smart_wallets_on_pool", "get_pool_detail", "get_my_positions", "discover_pools"]),
-  memory:      new Set(["get_pool_memory", "add_pool_note", "list_blacklist", "add_to_blacklist", "remove_from_blacklist"]),
+  decisions: new Set(["get_recent_decisions"]),
+  deploy: new Set(["deploy_position", "get_top_candidates", "get_active_bin", "get_pool_memory", "check_smart_wallets_on_pool", "get_token_holders", "get_token_narrative", "get_token_info", "search_pools", "get_wallet_balance", "get_my_positions", "add_pool_note"]),
+  close: new Set(["close_position", "get_my_positions", "get_position_pnl", "get_wallet_balance", "swap_token"]),
+  claim: new Set(["claim_fees", "get_my_positions", "get_position_pnl", "get_wallet_balance"]),
+  swap: new Set(["swap_token", "get_wallet_balance"]),
+  config: new Set(["update_config"]),
+  blocklist: new Set(["add_to_blacklist", "remove_from_blacklist", "list_blacklist", "block_deployer", "unblock_deployer", "list_blocked_deployers"]),
+  selfupdate: new Set(["self_update"]),
+  balance: new Set(["get_wallet_balance", "get_my_positions", "get_wallet_positions"]),
+  positions: new Set(["get_my_positions", "get_position_pnl", "get_wallet_balance", "set_position_note", "get_wallet_positions"]),
+  strategy: new Set(["list_strategies", "get_strategy", "add_strategy", "update_strategy", "delete_strategy", "remove_strategy", "set_active_strategy"]),
+  screen: new Set(["get_top_candidates", "get_token_holders", "get_token_narrative", "get_token_info", "search_pools", "check_smart_wallets_on_pool", "get_pool_detail", "get_my_positions", "discover_pools"]),
+  memory: new Set(["get_pool_memory", "add_pool_note", "list_blacklist", "add_to_blacklist", "remove_from_blacklist"]),
   smartwallet: new Set(["add_smart_wallet", "remove_smart_wallet", "list_smart_wallets", "check_smart_wallets_on_pool"]),
-  study:       new Set(["study_top_lpers", "get_top_lpers", "get_pool_detail", "search_pools", "get_token_info", "discover_pools", "add_smart_wallet", "list_smart_wallets"]),
+  study: new Set(["study_top_lpers", "get_top_lpers", "get_pool_detail", "search_pools", "get_token_info", "discover_pools", "add_smart_wallet", "list_smart_wallets"]),
   performance: new Set(["get_performance_history", "get_my_positions", "get_position_pnl"]),
-  lessons:     new Set(["add_lesson", "pin_lesson", "unpin_lesson", "list_lessons", "clear_lessons"]),
+  lessons: new Set(["add_lesson", "pin_lesson", "unpin_lesson", "list_lessons", "clear_lessons"]),
 };
 
 const INTENT_PATTERNS = [
-  { intent: "decisions",   re: /\b(why did you|why'd you|why was (?:this|that|it)|what made you|what was the reason|why no deploy|why didn't you deploy|why did you close|why did you deploy|why did you skip)\b/i },
-  { intent: "deploy",      re: /\b(deploy|open|add liquidity|lp into|invest in)\b/i },
-  { intent: "close",       re: /\b(close|exit|withdraw|remove liquidity|shut down)\b/i },
-  { intent: "claim",       re: /\b(claim|harvest|collect)\b.*\bfee/i },
-  { intent: "swap",        re: /\b(swap|convert|sell|exchange)\b/i },
-  { intent: "selfupdate",  re: /\b(self.?update|git pull|pull latest|update (the )?bot|update (the )?agent|update yourself)\b/i },
-  { intent: "blocklist",   re: /\b(blacklist|block|unblock|blocklist|blocked deployer|rugger|block dev|block deployer)\b/i },
-  { intent: "config",      re: /\b(config|setting|threshold|update|set |change)\b/i },
-  { intent: "balance",     re: /\b(balance|wallet|sol|how much)\b/i },
-  { intent: "positions",   re: /\b(position|portfolio|open|pnl|yield|range)\b/i },
-  { intent: "strategy",    re: /\b(strategy|strategies)\b/i },
-  { intent: "screen",      re: /\b(screen|candidate|find pool|search|research|token)\b/i },
-  { intent: "memory",      re: /\b(memory|pool history|note|remember)\b/i },
+  { intent: "decisions", re: /\b(why did you|why'd you|why was (?:this|that|it)|what made you|what was the reason|why no deploy|why didn't you deploy|why did you close|why did you deploy|why did you skip)\b/i },
+  { intent: "deploy", re: /\b(deploy|open|add liquidity|lp into|invest in)\b/i },
+  { intent: "close", re: /\b(close|exit|withdraw|remove liquidity|shut down)\b/i },
+  { intent: "claim", re: /\b(claim|harvest|collect)\b.*\bfee/i },
+  { intent: "swap", re: /\b(swap|convert|sell|exchange)\b/i },
+  { intent: "selfupdate", re: /\b(self.?update|git pull|pull latest|update (the )?bot|update (the )?agent|update yourself)\b/i },
+  { intent: "blocklist", re: /\b(blacklist|block|unblock|blocklist|blocked deployer|rugger|block dev|block deployer)\b/i },
+  { intent: "config", re: /\b(config|setting|threshold|update|set |change)\b/i },
+  { intent: "balance", re: /\b(balance|wallet|sol|how much)\b/i },
+  { intent: "positions", re: /\b(position|portfolio|open|pnl|yield|range)\b/i },
+  { intent: "strategy", re: /\b(strategy|strategies)\b/i },
+  { intent: "screen", re: /\b(screen|candidate|find pool|search|research|token)\b/i },
+  { intent: "memory", re: /\b(memory|pool history|note|remember)\b/i },
   { intent: "smartwallet", re: /\b(smart wallet|kol|whale|watch.?list|add wallet|remove wallet|list wallet|tracked wallet|check pool|who.?s in|wallets in|add to (smart|watch|kol))\b/i },
-  { intent: "study",       re: /\b(study top|top lpers?|best lpers?|who.?s lping|lp behavior|lpers?)\b/i },
+  { intent: "study", re: /\b(study top|top lpers?|best lpers?|who.?s lping|lp behavior|lpers?)\b/i },
   { intent: "performance", re: /\b(performance|history|how.?s the bot|how.?s it doing|stats|report)\b/i },
-  { intent: "lessons",     re: /\b(lesson|learned|teach|pin|unpin|clear lesson|what did you learn)\b/i },
+  { intent: "lessons", re: /\b(lesson|learned|teach|pin|unpin|clear lesson|what did you learn)\b/i },
 ];
 
 function getToolsForRole(agentType, goal = "") {
-  if (agentType === "MANAGER")  return tools.filter(t => MANAGER_TOOLS.has(t.function.name));
+  if (agentType === "MANAGER") return tools.filter(t => MANAGER_TOOLS.has(t.function.name));
   if (agentType === "SCREENER") return tools.filter(t => SCREENER_TOOLS.has(t.function.name));
 
   // GENERAL: match intent from goal, combine matched tool sets
@@ -97,6 +97,9 @@ const client = new OpenAI({
   baseURL: process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1",
   apiKey: process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY,
   timeout: 5 * 60 * 1000,
+  defaultHeaders: {
+    "Connection": "close",
+  },
 });
 
 const DEFAULT_MODEL = process.env.LLM_MODEL || "openrouter/healer-alpha";
@@ -413,4 +416,94 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Analyze a lesson rule and suggest configurations changes using the LLM.
+ */
+export async function getRecommendationForLesson(lessonRuleText) {
+  const model = config.llm.generalModel || config.llm.screeningModel || DEFAULT_MODEL;
+  
+  // Format config parameters we care about
+  const currentConfigStr = JSON.stringify({
+    screening: {
+      timeframe: config.screening.timeframe,
+      minVolume: config.screening.minVolume,
+      minTvl: config.screening.minTvl,
+      maxTvl: config.screening.maxTvl,
+      minMcap: config.screening.minMcap,
+      maxMcap: config.screening.maxMcap,
+      minOrganic: config.screening.minOrganic,
+      minQuoteOrganic: config.screening.minQuoteOrganic,
+      minHolders: config.screening.minHolders,
+      minBinStep: config.screening.minBinStep,
+      maxBinStep: config.screening.maxBinStep,
+      minFeeActiveTvlRatio: config.screening.minFeeActiveTvlRatio,
+      minTokenAgeHours: config.screening.minTokenAgeHours,
+      maxTokenAgeHours: config.screening.maxTokenAgeHours,
+      maxBotHoldersPct: config.screening.maxBotHoldersPct,
+      maxTop10Pct: config.screening.maxTop10Pct,
+    },
+    management: {
+      deployAmountSol: config.management.deployAmountSol,
+      minSolToOpen: config.management.minSolToOpen,
+      gasReserve: config.management.gasReserve,
+      stopLossPct: config.management.stopLossPct,
+      takeProfitPct: config.management.takeProfitPct,
+      minFeePerTvl24h: config.management.minFeePerTvl24h,
+      minAgeBeforeYieldCheck: config.management.minAgeBeforeYieldCheck,
+      slCooldownEnabled: config.management.slCooldownEnabled,
+      slCooldownHours: config.management.slCooldownHours,
+    },
+    risk: {
+      maxPositions: config.risk.maxPositions,
+      maxDeployAmount: config.risk.maxDeployAmount,
+    },
+    strategy: {
+      minBinsBelow: config.strategy.minBinsBelow,
+      maxBinsBelow: config.strategy.maxBinsBelow,
+      defaultBinsBelow: config.strategy.defaultBinsBelow,
+    }
+  }, null, 2);
+
+  const prompt = `
+Anda adalah asisten AI coding dan analis trading untuk bot DLMM.
+Diberikan sebuah lesson/pembelajaran hasil trading/evaluasi bot berikut:
+
+LESSON LEARNED:
+"${lessonRuleText}"
+
+Dan berikut adalah konfigurasi (config) bot saat ini:
+
+CURRENT CONFIG:
+${currentConfigStr}
+
+Tugas Anda adalah menganalisis lesson tersebut dan memberikan rekomendasi spesifik perubahan parameter konfigurasi yang logis untuk mencegah kerugian atau meningkatkan keuntungan di masa depan berdasarkan lesson di atas.
+
+Berikan output dalam format JSON array of objects yang valid (tanpa markdown block, tanpa penjelasan ekstra, hanya valid JSON):
+[
+  {
+    "path": "nama_kategori.nama_parameter", // e.g. "screening.minVolume", "management.stopLossPct"
+    "proposed": nilai_baru, // tipe data harus sesuai (number, boolean, dll)
+    "reason": "Penjelasan singkat dalam bahasa Indonesia mengapa parameter ini perlu diubah berdasarkan lesson"
+  }
+]
+
+HANYA rekomendasikan parameter yang BENAR-BENAR relevan dengan lesson tersebut. Jika lesson tidak berkaitan dengan parameter config, kembalikan array kosong [].
+  `;
+
+  try {
+    const response = await client.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1
+    });
+    
+    const text = response.choices[0]?.message?.content || "[]";
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    return JSON.parse(jsonrepair(cleaned));
+  } catch (error) {
+    log("recommender_error", `Failed to get LLM recommendation: ${error.message}`);
+    return [];
+  }
 }

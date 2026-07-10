@@ -720,7 +720,7 @@ export async function getTopCandidates({ limit = 10 } = {}) {
   return {
     candidates: eligible,
     total_screened: pools.length,
-    filtered_examples: filteredOut.slice(0, 3),
+    filtered_examples: filteredOut,
   };
 }
 
@@ -833,4 +833,166 @@ function pushFilteredReason(list, pool, reason) {
     name: pool.name || `${pool.base?.symbol || "?"}-${pool.quote?.symbol || "?"}`,
     reason,
   });
+}
+
+/**
+ * Check screening filters for a specific pool address or token address (CA).
+ * Returns detailed check results.
+ */
+export async function testScreeningFiltersForAddress(address) {
+  const { config } = await import("../config.js");
+  const s = config.screening;
+  const timeframe = s.timeframe || "30m";
+  
+  // 1. Try base_token_address
+  let url = `${POOL_DISCOVERY_BASE}/pools?page_size=5&filter_by=${encodeURIComponent(`base_token_address=${address}`)}&timeframe=${timeframe}`;
+  let res = await fetch(url);
+  let data = await res.json().catch(() => ({}));
+  let pools = data.data || [];
+  
+  // 2. If empty, try pool_address
+  if (pools.length === 0) {
+    url = `${POOL_DISCOVERY_BASE}/pools?page_size=1&filter_by=${encodeURIComponent(`pool_address=${address}`)}&timeframe=${timeframe}`;
+    res = await fetch(url);
+    data = await res.json().catch(() => ({}));
+    pools = data.data || [];
+  }
+  
+  if (pools.length === 0) {
+    return { found: false, error: "No DLMM pools found on Meteora for this token address or pool address." };
+  }
+  
+  const processedPools = await applyVolatilityTimeframe(pools, timeframe);
+  const results = [];
+  
+  const { getMyPositions } = await import("./dlmm.js");
+  const { positions } = await getMyPositions().catch(() => ({ positions: [] }));
+  const occupiedPools = new Set(positions.map((p) => p.pool));
+  const occupiedMints = new Set(positions.map((p) => p.base_mint).filter(Boolean));
+  
+  for (const pool of processedPools) {
+    const base = pool.token_x || {};
+    const quote = pool.token_y || {};
+    const binStep = numeric(pool.dlmm_params?.bin_step);
+    const tvl = numeric(pool.tvl ?? pool.active_tvl);
+    const feeActiveTvlRatio = numeric(pool.fee_active_tvl_ratio);
+    const volatility = numeric(pool.volatility);
+    const volume = numeric(pool.volume);
+    const holders = numeric(pool.base_token_holders);
+    const mcap = numeric(base.market_cap);
+    const baseOrganic = numeric(base.organic_score);
+    const quoteOrganic = numeric(quote.organic_score);
+    const launchpad = getPoolLaunchpad(pool);
+    const createdAt = numeric(base.created_at);
+    
+    const checks = [
+      {
+        name: "Meteora DLMM Pool Type",
+        passed: pool.pool_type === "dlmm",
+        value: pool.pool_type || "unknown",
+        expected: "dlmm"
+      },
+      {
+        name: "Market Cap (Mcap)",
+        passed: mcap != null && mcap >= s.minMcap && mcap <= s.maxMcap,
+        value: mcap != null ? `$${Math.round(mcap).toLocaleString()}` : "unknown",
+        expected: `$${s.minMcap.toLocaleString()} - $${s.maxMcap.toLocaleString()}`
+      },
+      {
+        name: "Token Holders",
+        passed: holders != null && holders >= s.minHolders,
+        value: holders != null ? holders.toLocaleString() : "unknown",
+        expected: `>= ${s.minHolders.toLocaleString()}`
+      },
+      {
+        name: "24h/Window Volume",
+        passed: volume != null && volume >= s.minVolume,
+        value: volume != null ? `$${Math.round(volume).toLocaleString()}` : "unknown",
+        expected: `>= $${s.minVolume.toLocaleString()}`
+      },
+      {
+        name: "Active Liquidity (TVL)",
+        passed: tvl != null && tvl >= s.minTvl && (s.maxTvl == null || tvl <= s.maxTvl),
+        value: tvl != null ? `$${Math.round(tvl).toLocaleString()}` : "unknown",
+        expected: `$${s.minTvl.toLocaleString()}` + (s.maxTvl != null ? ` - $${s.maxTvl.toLocaleString()}` : " (No limit)")
+      },
+      {
+        name: "Bin Step",
+        passed: binStep != null && binStep >= s.minBinStep && binStep <= s.maxBinStep,
+        value: binStep != null ? binStep : "unknown",
+        expected: `${s.minBinStep} - ${s.maxBinStep}`
+      },
+      {
+        name: "Fee / Active TVL Ratio",
+        passed: feeActiveTvlRatio != null && feeActiveTvlRatio >= s.minFeeActiveTvlRatio,
+        value: feeActiveTvlRatio != null ? `${feeActiveTvlRatio.toFixed(3)}%` : "unknown",
+        expected: `>= ${s.minFeeActiveTvlRatio}%`
+      },
+      {
+        name: "Base Token Organic Score",
+        passed: baseOrganic != null && baseOrganic >= s.minOrganic,
+        value: baseOrganic != null ? baseOrganic : "unknown",
+        expected: `>= ${s.minOrganic}`
+      },
+      {
+        name: "Quote Token Organic Score",
+        passed: quoteOrganic != null && quoteOrganic >= s.minQuoteOrganic,
+        value: quoteOrganic != null ? quoteOrganic : "unknown",
+        expected: `>= ${s.minQuoteOrganic}`
+      },
+      {
+        name: "Launchpad Filter",
+        passed: !includesCaseInsensitive(s.blockedLaunchpads, launchpad) && 
+                (!Array.isArray(s.allowedLaunchpads) || s.allowedLaunchpads.length === 0 || !launchpad || includesCaseInsensitive(s.allowedLaunchpads, launchpad)),
+        value: launchpad || "None",
+        expected: `Not blocked and in allowlist if set`
+      },
+      {
+        name: "Token Age",
+        passed: (function() {
+          if (createdAt == null) return false;
+          if (s.minTokenAgeHours != null && createdAt > Date.now() - s.minTokenAgeHours * 3_600_000) return false;
+          if (s.maxTokenAgeHours != null && createdAt < Date.now() - s.maxTokenAgeHours * 3_600_000) return false;
+          return true;
+        })(),
+        value: createdAt ? `${((Date.now() - createdAt) / 3_600_000).toFixed(1)} hours` : "unknown",
+        expected: `${s.minTokenAgeHours ?? 0}h` + (s.maxTokenAgeHours ? ` - ${s.maxTokenAgeHours}h` : " (No max)")
+      },
+      {
+        name: "Supply Concentration Warning",
+        passed: !s.excludeHighSupplyConcentration || pool.base_token_has_high_supply_concentration !== true,
+        value: pool.base_token_has_high_supply_concentration === true ? "High Concentration Warning" : "Clear",
+        expected: "Clear"
+      },
+      {
+        name: "Critical Audit Warnings",
+        passed: pool.base_token_has_critical_warnings !== true && pool.quote_token_has_critical_warnings !== true,
+        value: (pool.base_token_has_critical_warnings === true || pool.quote_token_has_critical_warnings === true) ? "Has Warnings" : "Clear",
+        expected: "Clear"
+      },
+      {
+        name: "Duplicate Position Guard",
+        passed: !occupiedPools.has(pool.pool) && !occupiedMints.has(pool.base?.mint),
+        value: occupiedPools.has(pool.pool) ? "Already open in pool" : occupiedMints.has(pool.base?.mint) ? "Already holding token" : "Clear",
+        expected: "No open positions"
+      },
+      {
+        name: "Pool Cooldown Guard",
+        passed: !isPoolOnCooldown(pool.pool) && !isBaseMintOnCooldown(pool.base?.mint),
+        value: isPoolOnCooldown(pool.pool) ? "Pool cooldown active" : isBaseMintOnCooldown(pool.base?.mint) ? "Token cooldown active" : "Clear",
+        expected: "No active cooldowns"
+      }
+    ];
+
+    const passedAll = checks.every(c => c.passed);
+    results.push({
+      pool: pool.pool,
+      name: pool.name,
+      base_mint: pool.base?.mint || pool.base_token_address,
+      passed: passedAll,
+      checks
+    });
+  }
+  
+  return { found: true, results };
 }

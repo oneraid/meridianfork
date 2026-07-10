@@ -77,6 +77,10 @@ function filterLibraryStrategies() {
         document.getElementById("cfg-pnlConfirmTicks").value = data.pnl?.confirmTicks ?? 2;
         document.getElementById("cfg-autoSwapRetryAttempts").value = data.management.autoSwapRetryAttempts ?? 3;
         document.getElementById("cfg-autoSwapRetryDelayMs").value = data.management.autoSwapRetryDelayMs ?? 3000;
+
+        // SL Cooldown settings
+        document.getElementById("cfg-slCooldownEnabled").checked = data.management.slCooldownEnabled ?? true;
+        document.getElementById("cfg-slCooldownHours").value = data.management.slCooldownHours ?? 8;
         
         document.getElementById("cfg-timeframe").value = data.screening.timeframe;
         document.getElementById("cfg-minVolume").value = data.screening.minVolume;
@@ -165,6 +169,10 @@ function filterLibraryStrategies() {
         degenTargetLpCount: Math.round(Number(document.getElementById("cfg-degenTargetLpCount").value)),
         degenTargetFeeRatio: Number(document.getElementById("cfg-degenTargetFeeRatio").value),
         degenTargetLiquidity: Number(document.getElementById("cfg-degenTargetLiquidity").value),
+
+        // SL Cooldown
+        slCooldownEnabled: document.getElementById("cfg-slCooldownEnabled").checked,
+        slCooldownHours: Math.max(1, Math.min(48, Math.round(Number(document.getElementById("cfg-slCooldownHours").value)))),
         
         managementIntervalMin: Math.round(Number(document.getElementById("cfg-managementIntervalMin").value)),
         screeningIntervalMin: Math.round(Number(document.getElementById("cfg-screeningIntervalMin").value)),
@@ -195,6 +203,98 @@ function filterLibraryStrategies() {
         showToast("Agent loop cycle initiated in background.");
       } catch {
         showToast("Failed to trigger agent loops", "error");
+      }
+    }
+
+    // Clear all lessons with confirmation
+    async function clearAllLessons() {
+      if (!confirm("⚠️ HAPUS SEMUA LESSONS?\n\nIni akan menghapus semua pembelajaran bot (lessons.json).\nData performance TIDAK akan terhapus.\n\nLanjutkan?")) return;
+      const statusEl = document.getElementById("clear-lessons-status");
+      const btn = document.getElementById("btn-clear-lessons");
+      try {
+        btn.disabled = true;
+        btn.textContent = "Menghapus...";
+        const res = await fetch("/api/lessons/clear-all", {
+          method: "DELETE",
+          headers: { "X-CSRF-Token": csrfToken }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        statusEl.style.display = "block";
+        statusEl.style.color = "var(--accent-green)";
+        statusEl.textContent = `✅ ${data.message}`;
+        showToast(data.message, "success");
+      } catch (e) {
+        statusEl.style.display = "block";
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = `❌ Gagal: ${e.message}`;
+        showToast("Gagal menghapus lessons: " + e.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg> Hapus Semua Lessons';
+        setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
+      }
+    }
+
+    // Clear performance data with confirmation
+    async function clearPerformanceData() {
+      if (!confirm("⚠️ HAPUS DATA PERFORMANCE?\n\nIni akan menghapus semua rekam jejak trade (data untuk Darwin learning).\nLessons TIDAK akan terhapus.\n\nLanjutkan?")) return;
+      const statusEl = document.getElementById("clear-lessons-status");
+      const btn = document.getElementById("btn-clear-performance");
+      try {
+        btn.disabled = true;
+        btn.textContent = "Menghapus...";
+        const res = await fetch("/api/lessons/clear-performance", {
+          method: "DELETE",
+          headers: { "X-CSRF-Token": csrfToken }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        statusEl.style.display = "block";
+        statusEl.style.color = "#f59e0b";
+        statusEl.textContent = `✅ ${data.message}`;
+        showToast(data.message, "success");
+      } catch (e) {
+        statusEl.style.display = "block";
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = `❌ Gagal: ${e.message}`;
+        showToast("Gagal hapus performance: " + e.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> Hapus Data Performance';
+        setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
+      }
+    }
+
+    // Clear database / history to reset winrate
+    async function clearDatabaseHistory() {
+      if (!confirm("⚠️ RESET WINRATE / HISTORY DATABASE?\n\nIni akan menghapus seluruh data history posisi yang sudah ditutup.\nPosisi aktif yang sedang berjalan TIDAK akan terhapus.\nWinrate di dashboard akan kembali ke 0%.\n\nLanjutkan?")) return;
+      const statusEl = document.getElementById("clear-lessons-status");
+      const btn = document.getElementById("btn-clear-history");
+      try {
+        btn.disabled = true;
+        btn.textContent = "Mereset...";
+        const res = await fetch("/api/state/clear-history", {
+          method: "DELETE",
+          headers: { "X-CSRF-Token": csrfToken }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        statusEl.style.display = "block";
+        statusEl.style.color = "var(--accent-blue)";
+        statusEl.textContent = `✅ ${data.message}`;
+        showToast(data.message, "success");
+        // Reload page or status to reflect immediately
+        if (typeof loadStatus === "function") loadStatus();
+      } catch (e) {
+        statusEl.style.display = "block";
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = `❌ Gagal: ${e.message}`;
+        showToast("Gagal mereset database history: " + e.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg> Reset Winrate / History';
+        setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 5000);
       }
     }
 

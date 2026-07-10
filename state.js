@@ -613,3 +613,25 @@ export function getPortfolioHistory() {
   return state.portfolioHistory || [];
 }
 
+/**
+ * Reset state history: deletes all closed positions and recent events,
+ * keeping open active positions intact.
+ */
+export function clearStateHistory() {
+  const state = load();
+  const all = Object.values(state.positions || {});
+  const openPositions = all.filter((p) => !p.closed);
+  const closedCount = all.filter((p) => p.closed).length;
+
+  state.positions = {};
+  for (const p of openPositions) {
+    state.positions[p.position] = p;
+  }
+  state.recentEvents = [];
+  // Also clear portfolioHistory so user has a clean reset
+  state.portfolioHistory = [];
+  save(state);
+  log("state", `Cleared state database history: deleted ${closedCount} closed positions, preserved ${openPositions.length} active positions`);
+  return closedCount;
+}
+

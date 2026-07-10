@@ -566,8 +566,8 @@ export async function runScreeningCycle({ silent = false } = {}) {
         .map((entry) => `- ${entry.name}: ${entry.reason}`)
         .join("\n");
       screenReport = combinedExamples
-        ? `No candidates available.\nFiltered examples:\n${combinedExamples}`
-        : `No candidates available (all filtered by launchpad / holder-quality rules).`;
+        ? `⛔ NO DEPLOY\n\nSiklus selesai tanpa entry yang valid.\n\n🗑️ DITOLAK\n${combinedExamples}`
+        : `⛔ NO DEPLOY\n\nSiklus selesai tanpa entry yang valid.\n(Semua kandidat difilter oleh aturan launchpad / kualitas holder)`;
       appendDecision({
         type: "no_deploy",
         actor: "SCREENER",
@@ -585,15 +585,15 @@ export async function runScreeningCycle({ silent = false } = {}) {
         screenReport = [
           "⛔ NO DEPLOY",
           "",
-          "Cycle finished with no valid entry.",
+          "Siklus selesai tanpa entry yang valid.",
           "",
-          "BEST LOOKING CANDIDATE",
+          "🥇 KANDIDAT TERBAIK",
           candidateName,
           "",
-          "WHY SKIPPED",
-          `Only one candidate survived filtering, but it was not worth deploying: ${skipReason}.`,
+          "❌ KENAPA DILEWATI",
+          `Hanya satu kandidat yang lolos filter, namun tidak layak untuk di-deploy: ${skipReason}.`,
           "",
-          "REJECTED",
+          "🗑️ DITOLAK",
           `- ${candidateName}: ${skipReason}`,
         ].join("\n");
         appendDecision({
@@ -681,12 +681,12 @@ STEPS:
 4. Report in this exact format (no tables, no extra sections):
    🚀 DEPLOYED
 
-   <pool name>
-   <pool address>
+   📛 <pool name>
+   🔗 <pool address>
 
-   ◎ <deploy amount> SOL | <strategy> | bin <active_bin>
-   Range: <minPrice> → <maxPrice>
-   Range cover: <downside %> downside | <upside %> upside | <total width %> total
+   ◎ <deploy amount> SOL  |  📐 <strategy>  |  🎯 bin <active_bin>
+   📏 Range: <minPrice> → <maxPrice>
+   🛡️ Cover: <downside %>% bawah  |  <upside %>% atas  |  <total width %> total
 
    IMPORTANT:
    - Do NOT calculate the range percentages yourself.
@@ -695,37 +695,38 @@ STEPS:
      range_coverage.upside_pct
      range_coverage.width_pct
 
-   MARKET
-   Fee/TVL: <x>%
-   Volume: $<x>
-   TVL: $<x>
-   Volatility: <x>
-   Organic: <x>
-   Mcap: $<x>
-   Age: <x>h
+   📊 DATA PASAR
+   💸 Fee/TVL: <x>%
+   📈 Volume: $<x>
+   💧 TVL: $<x>
+   🌊 Volatilitas: <x>
+   🌱 Organik: <x>
+   🏦 Mcap: $<x>
+   ⏱️ Usia: <x>h
 
-   AUDIT
-   Top10: <x>%
-   Bots: <x>%
-   Fees paid: <x> SOL
-   Smart wallets: <names or none>
+   🔍 AUDIT TOKEN
+   👥 Top10: <x>%
+   🤖 Bot: <x>%
+   💰 Fee terbayar: <x> SOL
+   🧠 Smart wallets: <names or none>
 
-   WHY THIS WON
-   <2-4 concise sentences on why this pool won, key risks, and why it still beat the alternatives>
+   ✅ KENAPA DIPILIH
+   <2-4 kalimat ringkas dalam Bahasa Indonesia: alasan pool ini menang, risiko utama, dan kenapa lebih baik dari alternatif lain>
 5. If no pool qualifies, report in this exact format instead:
    ⛔ NO DEPLOY
 
-   Cycle finished with no valid entry.
+   Siklus selesai tanpa entry yang valid.
 
-   BEST LOOKING CANDIDATE
+   🥇 KANDIDAT TERBAIK
    <name or none>
 
-   WHY SKIPPED
-   <2-4 concise sentences explaining why nothing was good enough>
+   ❌ KENAPA DILEWATI
+   <2-4 kalimat ringkas dalam Bahasa Indonesia: alasan tidak ada yang layak di-deploy>
 
-   REJECTED
-   <short flat list of top candidate names and why they were skipped>
-IMPORTANT:
+   🗑️ DITOLAK
+   <daftar singkat nama kandidat teratas dan alasan penolakannya, dalam Bahasa Indonesia>
+PENTING:
+- Tulis bagian KENAPA DIPILIH, KENAPA DILEWATI, dan DITOLAK dalam Bahasa Indonesia.
 - Keep the whole report compact and highly scannable for Telegram.
       `, config.llm.maxSteps, [], "SCREENER", config.llm.screeningModel, 2048, {
         onToolStart: async ({ name }) => {

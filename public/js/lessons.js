@@ -4,6 +4,25 @@ async function loadLessons() {
       try {
         const res = await fetch("/api/lessons");
         const data = await res.json();
+
+        // Sort lessons newest first
+        if (data && data.lessons) {
+          data.lessons.sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.id || 0);
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.id || 0);
+            return timeB - timeA;
+          });
+        }
+
+        // Sort performance newest first
+        if (data && data.performance) {
+          data.performance.sort((a, b) => {
+            const timeA = a.recorded_at ? new Date(a.recorded_at).getTime() : 0;
+            const timeB = b.recorded_at ? new Date(b.recorded_at).getTime() : 0;
+            return timeB - timeA;
+          });
+        }
+
         dashboardState.lessons = data;
 
         const perf = data.performance || [];
@@ -305,7 +324,16 @@ async function loadLessons() {
         makeSection("Target Role", roleDiv);
       }
 
+      // --- Config recommendations section ---
+      const recContainer = document.createElement("div");
+      recContainer.id = "lesson-rec-container";
+      recContainer.style.cssText = "margin-top:20px;border-top:1px solid var(--border-subtle);padding-top:16px;display:none;";
+      body.appendChild(recContainer);
+
       modal.showModal();
+      
+      // Trigger recommendations lookup
+      fetchRecommendationsForLesson(l.rule);
     }
 
     // Add lesson
@@ -331,3 +359,116 @@ async function loadLessons() {
     });
 
     // Filter Library Strategies based on chosen DLMM Shape
+
+    let currentLessonRecommendations = [];
+
+    async function fetchRecommendationsForLesson(rule) {
+      const container = document.getElementById("lesson-rec-container");
+      const applyBtn = document.getElementById("btn-apply-lesson-changes");
+      if (!container || !applyBtn) return;
+      
+      container.style.display = "block";
+      applyBtn.style.display = "none";
+      container.innerHTML = `
+        <div class="lesson-detail-label">💡 AI Config Recommendations</div>
+        <div style="color:var(--text-muted);font-size:12px;padding:8px 0;display:flex;align-items:center;gap:6px;">
+          <svg class="animate-spin" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="animation: spin 1s linear infinite;"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Menganalisis lesson untuk rekomendasi config...
+        </div>
+      `;
+      
+      try {
+        const res = await fetch("/api/lessons/recommend-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ rule })
+        });
+        const data = await res.json();
+        
+        if (!res.ok || !data.success || !data.recommendations || data.recommendations.length === 0) {
+          container.style.display = "none";
+          return;
+        }
+        
+        currentLessonRecommendations = data.recommendations;
+        
+        let html = `
+          <div class="lesson-detail-label">💡 AI Config Recommendations</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
+            Pilih rekomendasi parameter di bawah ini untuk diterapkan ke config Anda:
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+        `;
+        
+        data.recommendations.forEach((rec, idx) => {
+          const pathParts = rec.path.split(".");
+          const paramName = pathParts[pathParts.length - 1];
+          const cat = pathParts[0];
+          const currentVal = dashboardState.config?.[cat]?.[paramName] ?? "N/A";
+          
+          html += `
+            <label style="display:flex;align-items:flex-start;gap:10px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.15);border-radius:8px;padding:10px 12px;cursor:pointer;user-select:none;">
+              <input type="checkbox" name="lesson-rec-chk" value="${idx}" checked style="margin-top:3px;cursor:pointer;">
+              <div style="flex:1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:4px;">
+                  <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-light);">${rec.path}</span>
+                  <span style="font-size:11px;color:var(--text-muted);">
+                    Sebelumnya: <strong style="color:var(--text-secondary);">${currentVal}</strong> → Baru: <strong style="color:var(--success);">${rec.proposed}</strong>
+                  </span>
+                </div>
+                <div style="font-size:11px;color:var(--text-secondary);line-height:1.4;">${rec.reason}</div>
+              </div>
+            </label>
+          `;
+        });
+        
+        html += `</div>`;
+        container.innerHTML = html;
+        applyBtn.style.display = "block";
+      } catch (e) {
+        container.innerHTML = `<div style="color:#ff6b8a;font-size:12px;padding:8px 0;">❌ Gagal memuat rekomendasi config: ${e.message}</div>`;
+      }
+    }
+
+    async function applyCheckedConfigChanges() {
+      const chks = document.querySelectorAll('input[name="lesson-rec-chk"]:checked');
+      if (chks.length === 0) {
+        showToast("Pilih minimal satu perubahan untuk diterapkan", "error");
+        return;
+      }
+      
+      const changes = {};
+      chks.forEach((chk) => {
+        const idx = parseInt(chk.value);
+        const rec = currentLessonRecommendations[idx];
+        if (rec) {
+          const pathParts = rec.path.split(".");
+          const paramName = pathParts[pathParts.length - 1];
+          changes[paramName] = rec.proposed;
+        }
+      });
+      
+      const applyBtn = document.getElementById("btn-apply-lesson-changes");
+      applyBtn.disabled = true;
+      applyBtn.textContent = "Menerapkan...";
+      
+      try {
+        const res = await fetch("/api/config/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+          body: JSON.stringify({ changes })
+        });
+        const data = await res.json();
+        if (!res.ok || data.success === false) {
+          throw new Error(data.error || "Gagal menerapkan perubahan");
+        }
+        showToast("Konfigurasi berhasil diperbarui!");
+        document.getElementById("lesson-detail-modal").close();
+        if (typeof loadConfig === "function") loadConfig();
+      } catch (e) {
+        showToast("Gagal memperbarui konfigurasi: " + e.message, "error");
+      } finally {
+        applyBtn.disabled = false;
+        applyBtn.textContent = "Terapkan Perubahan";
+      }
+    }

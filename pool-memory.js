@@ -169,6 +169,19 @@ export function recordPoolDeploy(poolAddress, deployData) {
     entry.base_mint = deployData.base_mint;
   }
 
+  // Set cooldown for stop-loss closes — token crashed, don't redeploy immediately
+  const isStopLoss = String(deploy.close_reason || "").toLowerCase().includes("stop loss");
+  if (isStopLoss && (config.management.slCooldownEnabled ?? true)) {
+    const slCooldownHrs = Number(config.management.slCooldownHours ?? 8);
+    const reason = `stop loss (${deploy.pnl_pct ?? "?"}%)`;
+    const poolCd = setPoolCooldown(entry, slCooldownHrs, reason);
+    const mintCd = setBaseMintCooldown(db, entry.base_mint, slCooldownHrs, reason);
+    log("pool-memory", `SL Cooldown set for ${entry.name} until ${poolCd} (${reason})`);
+    if (entry.base_mint && mintCd) {
+      log("pool-memory", `SL Token cooldown set for ${entry.base_mint.slice(0, 8)} until ${mintCd} (${reason})`);
+    }
+  }
+
   // Set cooldown for low yield closes — pool wasn't profitable enough, don't redeploy soon
   if (deploy.close_reason === "low yield") {
     const cooldownHours = 4;

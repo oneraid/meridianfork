@@ -362,6 +362,18 @@ export function startDashboardServer(context = {}) {
     }
   });
 
+  app.get("/api/candidates/check-filter", requireAuth, async (req, res) => {
+    try {
+      const { address } = req.query;
+      if (!address) return res.status(400).json({ error: "Address query parameter is required" });
+      const { testScreeningFiltersForAddress } = await import("./tools/screening.js");
+      const result = await testScreeningFiltersForAddress(address.trim());
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/candidates/screen", requireAuth, requireCsrf, async (req, res) => {
     if (context.runScreeningCycle) {
       log("dashboard", "Manual screening cycle triggered via Web UI");
@@ -431,6 +443,55 @@ export function startDashboardServer(context = {}) {
       
       const result = await executeTool("add_lesson", { rule, tags });
       res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Clear ALL lessons (keeps performance data intact)
+  app.delete("/api/lessons/clear-all", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      const { clearAllLessons } = await import("./lessons.js");
+      const count = clearAllLessons();
+      log("dashboard", `Cleared all ${count} lessons via Web UI`);
+      res.json({ success: true, cleared: count, message: `${count} lesson(s) cleared successfully.` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Clear ALL performance records (keeps lessons intact)
+  app.delete("/api/lessons/clear-performance", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      const { clearPerformance } = await import("./lessons.js");
+      const count = clearPerformance();
+      log("dashboard", `Cleared all ${count} performance records via Web UI`);
+      res.json({ success: true, cleared: count, message: `${count} performance record(s) cleared.` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Clear state/history database to reset winrate
+  app.delete("/api/state/clear-history", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      const { clearStateHistory } = await import("./state.js");
+      const count = clearStateHistory();
+      log("dashboard", `Cleared position database history (${count} closed positions deleted) via Web UI`);
+      res.json({ success: true, cleared: count, message: `${count} closed position(s) history cleared. Winrate has been reset.` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Get config change recommendations for a specific lesson rule text
+  app.post("/api/lessons/recommend-config", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      const { rule } = req.body;
+      if (!rule) return res.status(400).json({ error: "Lesson rule text is required" });
+      const { getRecommendationForLesson } = await import("./agent.js");
+      const recommendations = await getRecommendationForLesson(rule);
+      res.json({ success: true, recommendations });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

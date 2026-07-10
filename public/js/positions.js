@@ -106,10 +106,15 @@ async function loadPositions() {
           copyBtn.className = "btn-ghost btn-xs";
           copyBtn.style.padding = "2px 4px";
           copyBtn.textContent = "Copy";
-          copyBtn.onclick = () => {
-            navigator.clipboard.writeText(p.position || "");
-            copyBtn.textContent = "✓";
-            copyBtn.style.color = "var(--success)";
+          copyBtn.onclick = async () => {
+            const ok = await copyTextToClipboard(p.position || "");
+            if (ok) {
+              copyBtn.textContent = "✓";
+              copyBtn.style.color = "var(--success)";
+            } else {
+              copyBtn.textContent = "Err";
+              copyBtn.style.color = "var(--danger)";
+            }
             setTimeout(() => {
               copyBtn.textContent = "Copy";
               copyBtn.style.color = "";
@@ -277,11 +282,13 @@ async function loadPositions() {
         btnCopy.style.cssText = "background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;display:inline-flex;align-items:center;border-radius:4px;transition:all 0.15s;";
         btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
         btnCopy.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(p.pool);
+          const ok = await copyTextToClipboard(p.pool);
+          if (ok) {
             btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="#10d9a0" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
-            setTimeout(() => { btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`; }, 1800);
-          } catch { showToast('Copy failed', 'error'); }
+          } else {
+            showToast('Copy failed', 'error');
+          }
+          setTimeout(() => { btnCopy.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`; }, 1800);
         };
         
         caDiv.appendChild(caText);

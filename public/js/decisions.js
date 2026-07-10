@@ -2,7 +2,7 @@ async function loadCandidates() {
       const tbody = document.getElementById("screener-table-body");
       tbody.replaceChildren();
       const trLoading = document.createElement("tr");
-      const tdLoading = document.createElement("td"); tdLoading.colSpan = 6;
+      const tdLoading = document.createElement("td"); tdLoading.colSpan = 7;
       tdLoading.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
       tdLoading.textContent = "Loading candidate pools…";
       trLoading.appendChild(tdLoading); tbody.appendChild(trLoading);
@@ -11,11 +11,12 @@ async function loadCandidates() {
         const res = await fetch("/api/candidates");
         const data = await res.json();
         dashboardState.candidates = data.candidates || data.pools || [];
+        dashboardState.candidatesFiltered = data.filtered_examples || [];
 
         tbody.replaceChildren();
         if (dashboardState.candidates.length === 0) {
           const tr = document.createElement("tr");
-          const td = document.createElement("td"); td.colSpan = 6;
+          const td = document.createElement("td"); td.colSpan = 7;
           td.style.cssText = "text-align:center;padding:48px;color:var(--text-muted);font-size:13px;";
           td.textContent = "No pools met filters. Try triggering a fresh screening run.";
           tr.appendChild(td); tbody.appendChild(tr); return;
@@ -24,11 +25,64 @@ async function loadCandidates() {
         dashboardState.candidates.forEach((c) => {
           const tr = document.createElement("tr");
 
-          // Name
+          // Name / CA / Pool
           const tdName = document.createElement("td");
           const divName = document.createElement("div"); divName.style.cssText = "font-weight:700;color:var(--text-primary);font-size:14px;"; divName.textContent = c.name;
-          const divAddr = document.createElement("div"); divAddr.style.cssText = "font-size:9px;font-family:'JetBrains Mono';color:var(--text-muted);margin-top:2px;"; divAddr.textContent = `${c.pool.slice(0,10)}…${c.pool.slice(-10)}`;
-          tdName.appendChild(divName); tdName.appendChild(divAddr); tr.appendChild(tdName);
+          tdName.appendChild(divName);
+
+          const baseMint = c.base?.mint || "";
+          if (baseMint) {
+            const divCA = document.createElement("div");
+            divCA.style.cssText = "display:flex;align-items:center;gap:4px;font-size:10px;font-family:'JetBrains Mono';color:var(--text-muted);margin-top:2px;";
+            
+            const labelCA = document.createElement("span");
+            labelCA.textContent = `CA: ${baseMint.slice(0,6)}…${baseMint.slice(-6)}`;
+            
+            const btnCopyCA = document.createElement("button");
+            btnCopyCA.title = "Copy Contract Address (CA)";
+            btnCopyCA.style.cssText = "background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;display:inline-flex;align-items:center;border-radius:4px;transition:all 0.15s;";
+            btnCopyCA.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
+            btnCopyCA.onclick = async (e) => {
+              e.stopPropagation();
+              const ok = await copyTextToClipboard(baseMint);
+              if (ok) {
+                btnCopyCA.innerHTML = `<svg width="10" height="10" fill="none" stroke="#10d9a0" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+              } else {
+                showToast('Copy CA failed', 'error');
+              }
+              setTimeout(() => { btnCopyCA.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`; }, 1500);
+            };
+            
+            divCA.appendChild(labelCA);
+            divCA.appendChild(btnCopyCA);
+            tdName.appendChild(divCA);
+          }
+
+          const divAddr = document.createElement("div");
+          divAddr.style.cssText = "display:flex;align-items:center;gap:4px;font-size:9px;font-family:'JetBrains Mono';color:var(--text-muted);margin-top:1px;";
+          
+          const labelPool = document.createElement("span");
+          labelPool.textContent = `PL: ${c.pool.slice(0,6)}…${c.pool.slice(-6)}`;
+          
+          const btnCopyPool = document.createElement("button");
+          btnCopyPool.title = "Copy Pool Address";
+          btnCopyPool.style.cssText = "background:none;border:none;cursor:pointer;color:var(--text-muted);padding:2px;display:inline-flex;align-items:center;border-radius:4px;transition:all 0.15s;";
+          btnCopyPool.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
+          btnCopyPool.onclick = async (e) => {
+            e.stopPropagation();
+            const ok = await copyTextToClipboard(c.pool);
+            if (ok) {
+              btnCopyPool.innerHTML = `<svg width="10" height="10" fill="none" stroke="#10d9a0" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+            } else {
+              showToast('Copy Pool failed', 'error');
+            }
+            setTimeout(() => { btnCopyPool.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`; }, 1500);
+          };
+          
+          divAddr.appendChild(labelPool);
+          divAddr.appendChild(btnCopyPool);
+          tdName.appendChild(divAddr);
+          tr.appendChild(tdName);
 
           // Fee ratio
           const tdRatio = document.createElement("td"); tdRatio.style.cssText = "font-weight:700;color:var(--accent-light);";
@@ -47,6 +101,11 @@ async function loadCandidates() {
           // Volatility
           const tdVol = document.createElement("td"); tdVol.style.cssText = "font-weight:600;color:var(--text-secondary);"; tdVol.textContent = c.volatility || "--"; tr.appendChild(tdVol);
 
+          // Detail
+          const tdDetail = document.createElement("td");
+          const btnDetail = document.createElement("button"); btnDetail.className = "btn-ghost btn-xs"; btnDetail.style.cssText = "font-size:11px;padding:4px 10px;border-radius:6px;white-space:nowrap;"; btnDetail.textContent = "Detail"; btnDetail.onclick = () => showPoolDetailModal(c, dashboardState.candidatesFiltered);
+          tdDetail.appendChild(btnDetail); tr.appendChild(tdDetail);
+
           // Deploy
           const tdDeploy = document.createElement("td");
           const btnDeploy = document.createElement("button"); btnDeploy.className = "btn-primary btn-xs"; btnDeploy.textContent = "Deploy LP"; btnDeploy.onclick = () => showDeployModal(c);
@@ -58,6 +117,101 @@ async function loadCandidates() {
         tbody.replaceChildren();
         showToast("Failed to fetch pool candidates", "error");
       }
+    }
+    // Pool Screening Detail Modal
+    function showPoolDetailModal(candidate, filteredPools) {
+      const modal  = document.getElementById("pool-detail-modal");
+      const title  = document.getElementById("pool-detail-modal-title");
+      const badge  = document.getElementById("pool-detail-modal-badge");
+      const sub    = document.getElementById("pool-detail-modal-subtitle");
+      const body   = document.getElementById("pool-detail-modal-body");
+
+      title.textContent = candidate.name || "Pool Detail";
+      sub.textContent   = `${candidate.pool.slice(0,12)}…${candidate.pool.slice(-8)}`;
+
+      // Badge — this pool passed since it's in the candidates list
+      badge.textContent = "✓ PASSED";
+      badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;background:rgba(16,217,160,0.12);color:var(--success);border:1px solid rgba(16,217,160,0.25);";
+
+      body.replaceChildren();
+
+      // ── Section: PASSED filters ─────────────────────────────────────────
+      const passedFilters = [
+        { label: "TVL",              value: `$${Math.round(candidate.tvl || candidate.active_tvl || 0).toLocaleString()}`, pass: true },
+        { label: "Fee / Active TVL", value: `${Number(candidate.fee_active_tvl_ratio || candidate.fee_tvl_ratio || 0).toFixed(3)}%`, pass: true },
+        { label: "Volume (window)",  value: `$${Math.round(candidate.volume_window || 0).toLocaleString()}`, pass: true },
+        { label: "Organic Score",    value: String(candidate.organic_score ?? "--"), pass: true },
+        { label: "Volatility",       value: String(candidate.volatility ?? "--"), pass: true },
+        { label: "Pool Cooldown",    value: "None active", pass: true },
+        { label: "Token Cooldown",   value: "None active", pass: true },
+        { label: "Dev Blocklist",    value: "Not blocked", pass: true },
+        { label: "PVP Risk",         value: candidate.is_pvp ? "Flagged" : "Clear", pass: !candidate.is_pvp },
+        { label: "Open Position",    value: "No duplicate", pass: true },
+        { label: "Indicator Confirm",value: candidate.indicator_confirmation ? (candidate.indicator_confirmation.confirmed ? "Confirmed" : "Rejected") : "N/A", pass: !candidate.indicator_confirmation || !!candidate.indicator_confirmation.confirmed },
+      ];
+
+      const passedSection = _buildDetailSection("✅ Passed Filters", passedFilters, "rgba(16,217,160,0.04)", "rgba(16,217,160,0.12)");
+      body.appendChild(passedSection);
+
+      // ── Section: FAILED pools from this screening run ───────────────────
+      const failedRows = (filteredPools || []).slice(0, 30).map((f) => ({
+        label: f.name || "Unknown pool",
+        value: f.reason || "Unknown reason",
+        pass: false,
+      }));
+
+      if (failedRows.length > 0) {
+        const failedSection = _buildDetailSection(
+          `❌ Rejected Pools (${failedRows.length} dari screening ini)`,
+          failedRows,
+          "rgba(255,77,109,0.04)",
+          "rgba(255,77,109,0.12)"
+        );
+        body.appendChild(failedSection);
+      } else {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.style.cssText = "padding:16px 20px;font-size:12px;color:var(--text-muted);";
+        emptyDiv.textContent = "Tidak ada pool yang ditolak tercatat di sesi screening ini.";
+        body.appendChild(emptyDiv);
+      }
+
+      modal.showModal();
+    }
+
+    function _buildDetailSection(heading, rows, bgSection, bgHeader) {
+      const section = document.createElement("div");
+      section.style.cssText = `margin-bottom:0;border-bottom:1px solid var(--border-subtle);background:${bgSection};`;
+
+      // Heading
+      const h = document.createElement("div");
+      h.style.cssText = `font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);padding:10px 20px 8px;background:${bgHeader};border-bottom:1px solid var(--border-subtle);`;
+      h.textContent = heading;
+      section.appendChild(h);
+
+      rows.forEach((row, i) => {
+        const item = document.createElement("div");
+        item.style.cssText = `display:flex;align-items:flex-start;gap:10px;padding:9px 20px;font-size:12px;border-bottom:${i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none"};`;
+
+        const icon = document.createElement("span");
+        icon.style.cssText = `flex-shrink:0;margin-top:1px;font-size:13px;color:${row.pass ? "var(--success)" : "#ff6b8a"};`;
+        icon.textContent = row.pass ? "✓" : "✗";
+
+        const labelEl = document.createElement("span");
+        labelEl.style.cssText = "flex:0 0 150px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;";
+        labelEl.textContent = row.label;
+        labelEl.title = row.label;
+
+        const valEl = document.createElement("span");
+        valEl.style.cssText = `flex:1;font-weight:600;color:${row.pass ? "var(--text-primary)" : "#ff6b8a"};word-break:break-word;min-width:0;`;
+        valEl.textContent = row.value;
+
+        item.appendChild(icon);
+        item.appendChild(labelEl);
+        item.appendChild(valEl);
+        section.appendChild(item);
+      });
+
+      return section;
     }
 
     // Deploy modal
@@ -187,6 +341,103 @@ async function loadCandidates() {
         const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;max-width:320px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
         tbody.appendChild(tr);
       });
+    }
+
+    // Filter checker logic
+    async function checkAddressFilters() {
+      const addressInput = document.getElementById("chk-filter-address");
+      const address = addressInput.value.trim();
+      const btn = document.getElementById("btn-check-filters");
+      const modal = document.getElementById("filter-check-modal");
+      const modalBody = document.getElementById("filter-check-modal-body");
+      
+      if (!address) {
+        showToast("Masukkan alamat CA / Pool terlebih dahulu", "error");
+        return;
+      }
+      
+      btn.disabled = true;
+      const origHtml = btn.innerHTML;
+      btn.textContent = "Checking...";
+      
+      // Open modal with loading state
+      modalBody.innerHTML = '<div style="color:var(--text-muted);padding:30px 0;text-align:center;font-size:14px;">🔍 Sedang mencari pool dan memeriksa kriteria filter...</div>';
+      modal.showModal();
+      
+      try {
+        const res = await fetch(`/api/candidates/check-filter?address=${encodeURIComponent(address)}`);
+        const data = await res.json();
+        
+        if (!res.ok || data.error) {
+          modalBody.innerHTML = `<div style="color:#ff4d6d;font-weight:600;padding:30px 0;text-align:center;font-size:14px;">❌ ${data.error || "Gagal melakukan pencarian"}</div>`;
+          return;
+        }
+        
+        if (!data.found || !data.results || data.results.length === 0) {
+          modalBody.innerHTML = `<div style="color:#ff4d6d;font-weight:600;padding:30px 0;text-align:center;font-size:14px;">❌ Tidak ada pool Meteora DLMM yang ditemukan untuk alamat ini.</div>`;
+          return;
+        }
+        
+        let html = "";
+        data.results.forEach((r) => {
+          const statusBadge = r.passed
+            ? '<span style="color:#10d9a0;background:rgba(16,217,160,0.12);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold;margin-left:8px;border:1px solid rgba(16,217,160,0.2)">✓ LOLOS FILTER</span>'
+            : '<span style="color:#ff4d6d;background:rgba(255,77,109,0.1);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold;margin-left:8px;border:1px solid rgba(255,77,109,0.2)">✗ GAGAL FILTER</span>';
+            
+          html += `
+            <div style="border-bottom: 1px dashed var(--border-subtle); padding-bottom: 20px; margin-bottom: 20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <strong style="color:var(--text-primary);font-size:15px;">🏊 Pool: ${r.name}</strong>
+                  <div style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono';margin-top:2px;">Pool Address: ${r.pool}</div>
+                </div>
+                <div>
+                  ${statusBadge}
+                </div>
+              </div>
+              
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border-subtle);color:var(--text-muted);text-align:left;">
+                    <th style="padding:8px;font-weight:600;">Kriteria / Filter</th>
+                    <th style="padding:8px;font-weight:600;">Value Token</th>
+                    <th style="padding:8px;font-weight:600;">Batas Minimal/Maksimal</th>
+                    <th style="padding:8px;font-weight:600;text-align:center;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+          `;
+          
+          r.checks.forEach((chk) => {
+            const rowColor = chk.passed ? "transparent" : "rgba(255,77,109,0.03)";
+            const statusIcon = chk.passed
+              ? '<span style="color:#10d9a0;font-weight:bold;display:flex;align-items:center;justify-content:center;gap:4px;">✓ Lolos</span>'
+              : '<span style="color:#ff4d6d;font-weight:bold;display:flex;align-items:center;justify-content:center;gap:4px;">✗ Gagal</span>';
+              
+            html += `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.02);background:${rowColor};">
+                <td style="padding:8px;font-weight:600;color:var(--text-secondary);">${chk.name}</td>
+                <td style="padding:8px;font-family:'JetBrains Mono';color:var(--text-primary);">${chk.value}</td>
+                <td style="padding:8px;color:var(--text-muted);">${chk.expected}</td>
+                <td style="padding:8px;text-align:center;">${statusIcon}</td>
+              </tr>
+            `;
+          });
+          
+          html += `
+                </tbody>
+              </table>
+            </div>
+          `;
+        });
+        
+        modalBody.innerHTML = html;
+      } catch (e) {
+        modalBody.innerHTML = `<div style="color:#ff4d6d;font-weight:600;padding:30px 0;text-align:center;font-size:14px;">❌ Terjadi kesalahan: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
     }
 
     // Dashboard decisions feed
