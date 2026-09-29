@@ -1,369 +1,633 @@
 <div id="view-config" style="display:none;">
-          <div class="section-header" style="margin-bottom:20px;">
-            <div class="section-title">
-              <div class="section-dot"></div>
-              Configuration Panel
+  <div class="section-header" style="margin-bottom:24px;">
+    <div class="section-title" style="font-size:17px;">
+      <div class="section-dot"></div>
+      Configuration Panel
+      <span class="cfg-badge cfg-badge-purple" style="margin-left:6px;">Live Settings</span>
+    </div>
+    <button type="button" onclick="saveConfiguration()" class="btn-primary btn-sm" style="display:flex;align-items:center;gap:8px;padding:8px 18px;font-size:13px;box-shadow:0 0 16px rgba(124,92,255,0.35);">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+      Save Settings
+    </button>
+  </div>
+
+  <form id="config-form" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:20px;">
+    
+    <!-- RPC Endpoints & API Failover Bar (Compact) -->
+    <div class="cfg-section" style="grid-column: 1 / -1;background:rgba(20,24,35,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="cfg-title-icon" style="background:rgba(59,130,246,0.18);border-color:rgba(59,130,246,0.35);color:#60a5fa;margin-bottom:0;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span>Solana RPC:</span>
+              <span id="cfg-rpc-active-badge" class="cfg-badge cfg-badge-green" style="font-size:11px;padding:2px 8px;">Active: Memuat...</span>
+              <span id="cfg-rpc-summary-counts" style="font-size:12px;color:var(--text-muted);font-weight:400;margin-left:4px;"></span>
             </div>
-            <button onclick="saveConfiguration()" class="btn-primary btn-sm">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-              Save Settings
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" onclick="openRpcDetailModal()" class="btn-sm" style="background:rgba(124,92,255,0.15);color:var(--accent-light);border:1px solid rgba(124,92,255,0.3);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(124,92,255,0.25)'" onmouseout="this.style.background='rgba(124,92,255,0.15)'">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+            Detail RPC &amp; API Key
+          </button>
+          <button type="button" id="btn-probe-rpc" onclick="probeRpcEndpoints()" class="btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(59,130,246,0.25)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
+            <svg id="icon-probe-rpc" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Tes RPC
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Risk & Capital -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        Risk &amp; Capital Allocation
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label class="form-label">Base SOL per Position <span class="form-label-hint">Ukuran modal / pool</span></label>
+          <input type="number" step="0.05" id="cfg-deployAmountSol" class="form-input">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min SOL to Open</label>
+            <input type="number" step="0.05" id="cfg-minSolToOpen" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gas Reserve (SOL)</label>
+            <input type="number" step="0.01" id="cfg-gasReserve" class="form-input">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Max Open Positions</label>
+            <input type="number" step="1" id="cfg-maxPositions" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max SOL Cap per Pos</label>
+            <input type="number" step="1" id="cfg-maxDeployAmount" class="form-input">
+          </div>
+        </div>
+        <div class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              SOL Mode Display
+            </div>
+            <div class="toggle-desc">Tampilkan nominal posisi, PnL, dan saldo dalam unit SOL</div>
+          </div>
+          <label class="toggle-control" for="cfg-solMode">
+            <input type="checkbox" id="cfg-solMode" class="toggle-input">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exit Rules -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </div>
+        Exit Rules &amp; Trailing Take Profit
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Take Profit (%) <span class="form-label-hint">TP</span></label>
+            <input type="number" step="0.5" id="cfg-takeProfitPct" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stop Loss (%) <span class="form-label-hint">SL</span></label>
+            <input type="number" step="0.5" id="cfg-stopLossPct" class="form-input">
+          </div>
+        </div>
+        
+        <div class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+              Enable Trailing Take Profit
+            </div>
+            <div class="toggle-desc">Kunci keuntungan secara dinamis saat harga bergerak naik</div>
+          </div>
+          <label class="toggle-control" for="cfg-trailingTakeProfit">
+            <input type="checkbox" id="cfg-trailingTakeProfit" class="toggle-input">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Trailing Trigger (%)</label>
+            <input type="number" step="0.1" id="cfg-trailingTriggerPct" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Trailing Drop (%)</label>
+            <input type="number" step="0.1" id="cfg-trailingDropPct" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">OOR Bin Limit</label>
+            <input type="number" step="1" id="cfg-outOfRangeBinsToClose" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">OOR Wait Minutes</label>
+            <input type="number" step="1" id="cfg-outOfRangeWaitMinutes" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Yield / TVL 24h (%)</label>
+            <input type="number" step="1" id="cfg-minFeePerTvl24h" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Yield Check Cooldown (min)</label>
+            <input type="number" step="1" id="cfg-minAgeBeforeYieldCheck" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:2px;border-top:1px dashed rgba(100,80,255,0.15);padding-top:14px;">
+          <div class="form-group">
+            <label class="form-label">PnL Confirm Ticks</label>
+            <input type="number" step="1" id="cfg-pnlConfirmTicks" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Auto-Swap Retries</label>
+            <input type="number" step="1" id="cfg-autoSwapRetryAttempts" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Auto-Swap Delay</label>
+            <input type="number" step="100" id="cfg-autoSwapRetryDelayMs" class="form-input">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screener Criteria -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+        </div>
+        Screener Criteria
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Candle Timeframe</label>
+            <select id="cfg-timeframe" class="form-input">
+              <option value="5m">5m</option>
+              <option value="30m">30m</option>
+              <option value="1h">1h</option>
+              <option value="2h">2h</option>
+              <option value="4h">4h</option>
+              <option value="24h">24h</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Min 24h Volume (USD)</label>
+            <input type="number" step="100" id="cfg-minVolume" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min fee/active-TVL (%)</label>
+            <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Lone Candidate Min Degen</label>
+            <input type="number" step="1" id="cfg-loneCandidateMinDegen" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min TVL (USD)</label>
+            <input type="number" step="5000" id="cfg-minTvl" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max TVL (USD)</label>
+            <input type="number" step="5000" id="cfg-maxTvl" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Mcap (USD)</label>
+            <input type="number" step="5000" id="cfg-minMcap" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Mcap (USD)</label>
+            <input type="number" step="5000" id="cfg-maxMcap" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Organic Score</label>
+            <input type="number" step="1" id="cfg-minOrganic" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Min Token Holders</label>
+            <input type="number" step="50" id="cfg-minHolders" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Token Age (Hours)</label>
+            <input type="number" step="1" id="cfg-minTokenAgeHours" class="form-input" placeholder="e.g. 12 (opsional)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Token Age (Hours)</label>
+            <input type="number" step="1" id="cfg-maxTokenAgeHours" class="form-input" placeholder="e.g. 72 (opsional)">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Pct Below ATH (%)</label>
+            <input type="number" step="1" id="cfg-minPctBelowAth" class="form-input" placeholder="e.g. 30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ATH Source</label>
+            <select id="cfg-athSource" class="form-input">
+              <option value="meteora">Meteora DLMM (Pool High)</option>
+              <option value="gmgn">GMGN (Global Token ATH)</option>
+              <option value="both">Both (Strict - Must Pass Both)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Bin Step</label>
+            <input type="number" step="1" id="cfg-minBinStep" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Bin Step</label>
+            <input type="number" step="1" id="cfg-maxBinStep" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Min Bins Below</label>
+            <input type="number" step="1" id="cfg-minBinsBelow" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Bins Below</label>
+            <input type="number" step="1" id="cfg-maxBinsBelow" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Bins</label>
+            <input type="number" step="1" id="cfg-defaultBinsBelow" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;">
+          <div class="form-group">
+            <label class="form-label">Active Library Strategy</label>
+            <select id="cfg-activeStrategyId" class="form-input"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DLMM Strategy Shape</label>
+            <select id="cfg-strategy" class="form-input">
+              <option value="bid_ask">Bid-Ask</option>
+              <option value="spot">Spot</option>
+              <option value="curve">Curve</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opportunity Poller & Degen Score Calibration -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        Opportunity Poller &amp; Degen Score
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Enable Opportunity Poller
+            </div>
+            <div class="toggle-desc">Scan pool &amp; momentum memecoin secara realtime untuk entry cepat</div>
+          </div>
+          <label class="toggle-control" for="cfg-opportunityPollEnabled">
+            <input type="checkbox" id="cfg-opportunityPollEnabled" class="toggle-input">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Poll Interval (sec)</label>
+            <input type="number" step="1" id="cfg-opportunityPollIntervalSec" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Poll Limit (pools)</label>
+            <input type="number" step="1" id="cfg-opportunityPollLimit" class="form-input">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Min Degen Score to Deploy</label>
+            <input type="number" step="1" id="cfg-opportunityMinScore" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Smart Wallet Bonus Score</label>
+            <input type="number" step="1" id="cfg-opportunitySmartWalletBonus" class="form-input">
+          </div>
+        </div>
+        
+        <div style="margin-top:4px;border-top:1px dashed rgba(100,80,255,0.15);padding-top:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">Degen Score Targets (30m normalized)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+               <label class="form-label">Target Vol/Tvl Ratio</label>
+               <input type="number" step="1" id="cfg-degenTargetVolRatio" class="form-input">
+            </div>
+            <div class="form-group">
+               <label class="form-label">Target LP Count</label>
+               <input type="number" step="1" id="cfg-degenTargetLpCount" class="form-input">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group">
+               <label class="form-label">Target Fee/Tvl Ratio</label>
+               <input type="number" step="0.05" id="cfg-degenTargetFeeRatio" class="form-input">
+            </div>
+            <div class="form-group">
+               <label class="form-label">Target Liquidity (USD)</label>
+               <input type="number" step="1000" id="cfg-degenTargetLiquidity" class="form-input">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule & LLM -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+        </div>
+        Schedule Intervals &amp; LLM Models
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Management Cycle (min)</label>
+            <input type="number" step="1" id="cfg-managementIntervalMin" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Screening Cycle (min)</label>
+            <input type="number" step="1" id="cfg-screeningIntervalMin" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Screening LLM Model</label>
+          <input type="text" id="cfg-screeningModel" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Management LLM Model</label>
+          <input type="text" id="cfg-managementModel" class="form-input">
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart & Technical Indicators -->
+    <div class="cfg-section">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>
+        </div>
+        Chart Indicators &amp; Technical Analysis
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              Enable Chart Indicators Confirmation
+            </div>
+            <div class="toggle-desc">Wajibkan konfirmasi indikator teknikal (Supertrend, RSI, Bollinger) sebelum entry</div>
+          </div>
+          <label class="toggle-control" for="cfg-chartIndicators">
+            <input type="checkbox" id="cfg-chartIndicators" class="toggle-input">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Entry Preset</label>
+            <select id="cfg-indicatorEntryPreset" class="form-input">
+              <option value="supertrend_break">Supertrend Breakout</option>
+              <option value="rsi_reversal">RSI Reversal (Oversold)</option>
+              <option value="bollinger_reversion">Bollinger Band Reversion</option>
+              <option value="rsi_plus_supertrend">RSI + Bullish Supertrend</option>
+              <option value="supertrend_or_rsi">Supertrend OR RSI Oversold</option>
+              <option value="bb_plus_rsi">BB Lower + RSI Oversold</option>
+              <option value="fibo_reclaim">Fibonacci Reclaim</option>
+              <option value="fibo_reject">Fibonacci Reject</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Exit Preset</label>
+            <select id="cfg-indicatorExitPreset" class="form-input">
+              <option value="supertrend_break">Supertrend Breakout</option>
+              <option value="rsi_reversal">RSI Reversal (Overbought)</option>
+              <option value="bollinger_reversion">Bollinger Band Reversion</option>
+              <option value="rsi_plus_supertrend">RSI + Bearish Supertrend</option>
+              <option value="supertrend_or_rsi">Supertrend OR RSI Overbought</option>
+              <option value="bb_plus_rsi">BB Upper + RSI Overbought</option>
+              <option value="fibo_reclaim">Fibonacci Reclaim</option>
+              <option value="fibo_reject">Fibonacci Reject</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Intervals (Timeframes)</label>
+            <input type="text" id="cfg-indicatorIntervals" class="form-input" placeholder="e.g. 5_MINUTE, 15_MINUTE">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Candles Count</label>
+            <input type="number" step="1" id="cfg-indicatorCandles" class="form-input" placeholder="298">
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="form-group">
+            <label class="form-label">RSI Length</label>
+            <input type="number" step="1" id="cfg-rsiLength" class="form-input" placeholder="2">
+          </div>
+          <div class="form-group">
+            <label class="form-label">RSI Oversold</label>
+            <input type="number" step="1" id="cfg-rsiOversold" class="form-input" placeholder="30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">RSI Overbought</label>
+            <input type="number" step="1" id="cfg-rsiOverbought" class="form-input" placeholder="80">
+          </div>
+        </div>
+
+        <div class="toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Require All Timeframes
+            </div>
+            <div class="toggle-desc">Wajibkan konfirmasi indikator lolos di semua interval candle yang dipilih</div>
+          </div>
+          <label class="toggle-control" for="cfg-requireAllIntervals">
+            <input type="checkbox" id="cfg-requireAllIntervals" class="toggle-input">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Learning & Cooldown Rules -->
+    <div class="cfg-section" style="grid-column: 1 / -1;">
+      <div class="cfg-section-title">
+        <div class="cfg-title-icon" style="background:rgba(124,92,255,0.2);border-color:rgba(124,92,255,0.4);">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+        Agent Learning &amp; Cooldown Rules
+        <span class="cfg-badge cfg-badge-green" style="margin-left:auto;">Self-Tuning &amp; Safety</span>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px;">
+
+        <!-- Clear Lessons Panel -->
+        <div class="cfg-subcard" style="background:rgba(239,68,68,0.04);border-color:rgba(239,68,68,0.2);">
+          <div class="cfg-subcard-header">
+            <div class="cfg-subcard-title" style="color:#f87171;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              Lesson Management
+            </div>
+            <span class="cfg-badge cfg-badge-red">Memory</span>
+          </div>
+          <div class="cfg-subcard-desc">
+            Hapus akumulasi memory atau riwayat performa jika pasar berubah drastis atau bot terlalu sering trigger SL akibat lesson lama.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:8px;">
+            <button type="button" id="btn-clear-lessons" onclick="clearAllLessons()" class="btn-sm" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.28)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              Hapus Lessons
+            </button>
+            <button type="button" id="btn-clear-performance" onclick="clearPerformanceData()" class="btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.22)'" onmouseout="this.style.background='rgba(245,158,11,0.12)'">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              Hapus Performance
+            </button>
+            <button type="button" id="btn-clear-history" onclick="clearDatabaseHistory()" class="btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(59,130,246,0.22)'" onmouseout="this.style.background='rgba(59,130,246,0.12)'">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+              Reset Winrate
             </button>
           </div>
-
-          <form id="config-form" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <!-- Risk & Capital -->
-            <div class="cfg-section">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                Risk & Capital Allocation
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div class="form-group">
-                  <label class="form-label">Base SOL per Position</label>
-                  <input type="number" step="0.05" id="cfg-deployAmountSol" class="form-input">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min SOL to Open</label>
-                    <input type="number" step="0.05" id="cfg-minSolToOpen" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Gas Reserve (SOL)</label>
-                    <input type="number" step="0.01" id="cfg-gasReserve" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Max Open Positions</label>
-                    <input type="number" step="1" id="cfg-maxPositions" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Max SOL Cap per Position</label>
-                    <input type="number" step="1" id="cfg-maxDeployAmount" class="form-input">
-                  </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
-                  <input type="checkbox" id="cfg-solMode" class="form-checkbox">
-                  <label for="cfg-solMode" class="form-label" style="cursor:pointer;margin:0;">SOL Mode Display</label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Exit Rules -->
-            <div class="cfg-section">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                Exit Rules & Trailing Take Profit
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Take Profit (%)</label>
-                    <input type="number" step="0.5" id="cfg-takeProfitPct" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Stop Loss (%)</label>
-                    <input type="number" step="0.5" id="cfg-stopLossPct" class="form-input">
-                  </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
-                  <input type="checkbox" id="cfg-trailingTakeProfit" class="form-checkbox">
-                  <label for="cfg-trailingTakeProfit" class="form-label" style="cursor:pointer;margin:0;">Enable Trailing Take Profit</label>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Trailing Trigger (%)</label>
-                    <input type="number" step="0.1" id="cfg-trailingTriggerPct" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Trailing Drop (%)</label>
-                    <input type="number" step="0.1" id="cfg-trailingDropPct" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">OOR Bin Limit</label>
-                    <input type="number" step="1" id="cfg-outOfRangeBinsToClose" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">OOR Wait Minutes</label>
-                    <input type="number" step="1" id="cfg-outOfRangeWaitMinutes" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Yield / TVL 24h (%)</label>
-                    <input type="number" step="1" id="cfg-minFeePerTvl24h" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Yield Check Cooldown (min)</label>
-                    <input type="number" step="1" id="cfg-minAgeBeforeYieldCheck" class="form-input">
-                  </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
-                  <div class="form-group">
-                    <label class="form-label">PnL Confirm Ticks</label>
-                    <input type="number" step="1" id="cfg-pnlConfirmTicks" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Auto-Swap Retries</label>
-                    <input type="number" step="1" id="cfg-autoSwapRetryAttempts" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Auto-Swap Delay (ms)</label>
-                    <input type="number" step="100" id="cfg-autoSwapRetryDelayMs" class="form-input">
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Screener Criteria -->
-            <div class="cfg-section">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                Screener Criteria
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Candle Timeframe</label>
-                    <select id="cfg-timeframe" class="form-input">
-                      <option value="5m">5m</option>
-                      <option value="30m">30m</option>
-                      <option value="1h">1h</option>
-                      <option value="2h">2h</option>
-                      <option value="4h">4h</option>
-                      <option value="24h">24h</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Min 24h Volume (USD)</label>
-                    <input type="number" step="100" id="cfg-minVolume" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min fee/active-TVL ratio (%)</label>
-                    <input type="number" step="0.01" id="cfg-minFeeActiveTvlRatio" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Lone Candidate Min Degen</label>
-                    <input type="number" step="1" id="cfg-loneCandidateMinDegen" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min TVL (USD)</label>
-                    <input type="number" step="5000" id="cfg-minTvl" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Max TVL (USD)</label>
-                    <input type="number" step="5000" id="cfg-maxTvl" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Mcap (USD)</label>
-                    <input type="number" step="5000" id="cfg-minMcap" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Max Mcap (USD)</label>
-                    <input type="number" step="5000" id="cfg-maxMcap" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Organic Score</label>
-                    <input type="number" step="1" id="cfg-minOrganic" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Min Token Holders</label>
-                    <input type="number" step="50" id="cfg-minHolders" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Bin Step</label>
-                    <input type="number" step="1" id="cfg-minBinStep" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Max Bin Step</label>
-                    <input type="number" step="1" id="cfg-maxBinStep" class="form-input">
-                  </div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Bins Below</label>
-                    <input type="number" step="1" id="cfg-minBinsBelow" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Max Bins Below</label>
-                    <input type="number" step="1" id="cfg-maxBinsBelow" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Default Bins</label>
-                    <input type="number" step="1" id="cfg-defaultBinsBelow" class="form-input">
-                  </div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-                  <div class="form-group">
-                    <label class="form-label">Active Library Strategy</label>
-                    <select id="cfg-activeStrategyId" class="form-input"></select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">DLMM Strategy Shape</label>
-                    <select id="cfg-strategy" class="form-input">
-                      <option value="bid_ask">Bid-Ask</option>
-                      <option value="spot">Spot</option>
-                      <option value="curve">Curve</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Opportunity Poller & Degen Score Calibration -->
-            <div class="cfg-section">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                Opportunity Poller & Degen Score Calibration
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div style="display:flex;align-items:center;gap:10px;padding:2px 0;">
-                  <input type="checkbox" id="cfg-opportunityPollEnabled" class="form-checkbox">
-                  <label for="cfg-opportunityPollEnabled" class="form-label" style="cursor:pointer;margin:0;">Enable Opportunity Poller</label>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Poll Interval (sec)</label>
-                    <input type="number" step="1" id="cfg-opportunityPollIntervalSec" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Poll Limit (pools)</label>
-                    <input type="number" step="1" id="cfg-opportunityPollLimit" class="form-input">
-                  </div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Min Degen Score to Deploy</label>
-                    <input type="number" step="1" id="cfg-opportunityMinScore" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Smart Wallet Bonus Score</label>
-                    <input type="number" step="1" id="cfg-opportunitySmartWalletBonus" class="form-input">
-                  </div>
-                </div>
-                
-                <div style="margin-top: 4px; border-top: 1px dashed var(--border-subtle); padding-top: 12px;">
-                  <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Degen Score Targets (30m normalized)</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div class="form-group">
-                       <label class="form-label">Target Vol/Tvl Ratio</label>
-                       <input type="number" step="1" id="cfg-degenTargetVolRatio" class="form-input">
-                    </div>
-                    <div class="form-group">
-                       <label class="form-label">Target LP Count</label>
-                       <input type="number" step="1" id="cfg-degenTargetLpCount" class="form-input">
-                    </div>
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-                    <div class="form-group">
-                       <label class="form-label">Target Fee/Tvl Ratio</label>
-                       <input type="number" step="0.05" id="cfg-degenTargetFeeRatio" class="form-input">
-                    </div>
-                    <div class="form-group">
-                       <label class="form-label">Target Liquidity (USD)</label>
-                       <input type="number" step="1000" id="cfg-degenTargetLiquidity" class="form-input">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Schedule & LLM -->
-            <div class="cfg-section">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                Schedule Intervals & LLM Models
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                  <div class="form-group">
-                    <label class="form-label">Management Cycle (min)</label>
-                    <input type="number" step="1" id="cfg-managementIntervalMin" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Screening Cycle (min)</label>
-                    <input type="number" step="1" id="cfg-screeningIntervalMin" class="form-input">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Screening LLM Model</label>
-                  <input type="text" id="cfg-screeningModel" class="form-input">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Management LLM Model</label>
-                  <input type="text" id="cfg-managementModel" class="form-input">
-                </div>
-              </div>
-            </div>
-
-            <!-- Agent Learning & Stop Loss Cooldown -->
-            <div class="cfg-section" style="grid-column: 1 / -1;">
-              <div class="cfg-section-title">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                Agent Learning &amp; Stop Loss Cooldown
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-
-                <!-- Clear Lessons Panel -->
-                <div style="display:flex;flex-direction:column;gap:12px;">
-                  <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Lesson Management</div>
-                  <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:14px;">
-                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5;">
-                      Hapus semua lesson yang terakumulasi. Berguna saat bot belajar pola pasar yang sudah tidak relevan atau terlalu sering SL akibat lesson lama.
-                    </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                      <button id="btn-clear-lessons" onclick="clearAllLessons()" class="btn-sm" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">
-                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        Hapus Semua Lessons
-                      </button>
-                      <button id="btn-clear-performance" onclick="clearPerformanceData()" class="btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.22)'" onmouseout="this.style.background='rgba(245,158,11,0.12)'">
-                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        Hapus Data Performance
-                      </button>
-                      <button id="btn-clear-history" onclick="clearDatabaseHistory()" class="btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(59,130,246,0.22)'" onmouseout="this.style.background='rgba(59,130,246,0.12)'">
-                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
-                        Reset Winrate / History
-                      </button>
-                    </div>
-                    <div id="clear-lessons-status" style="display:none;margin-top:10px;font-size:12px;color:var(--accent-green);"></div>
-                  </div>
-                </div>
-
-                <!-- SL Cooldown Settings -->
-                <div style="display:flex;flex-direction:column;gap:12px;">
-                  <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Stop Loss Cooldown Strategy</div>
-                  <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:14px;">
-                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5;">
-                      Setelah terkena Stop Loss, bot tidak akan masuk kembali ke pool atau token yang sama selama periode cooldown.
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                      <input type="checkbox" id="cfg-slCooldownEnabled" class="form-checkbox">
-                      <label for="cfg-slCooldownEnabled" class="form-label" style="cursor:pointer;margin:0;font-weight:600;">Enable SL Cooldown</label>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Durasi Cooldown setelah SL (jam)</label>
-                      <input type="number" step="1" min="1" max="48" id="cfg-slCooldownHours" class="form-input" placeholder="6-12 jam disarankan">
-                      <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Rekomendasi: 6–12 jam. Min 1 jam, Max 48 jam.</div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </form>
+          <div id="clear-lessons-status" style="display:none;margin-top:6px;font-size:12px;color:var(--accent-green);"></div>
         </div>
+
+        <!-- SL Cooldown Settings -->
+        <div class="cfg-subcard" style="background:rgba(99,102,241,0.04);border-color:rgba(99,102,241,0.2);">
+          <div class="cfg-subcard-header">
+            <div class="cfg-subcard-title" style="color:var(--accent-light);">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Stop Loss Cooldown Strategy
+            </div>
+            <span class="cfg-badge cfg-badge-purple">Protection</span>
+          </div>
+          <div class="cfg-subcard-desc">
+            Setelah terkena Stop Loss, bot tidak akan masuk kembali ke pool atau token yang sama selama periode cooldown.
+          </div>
+          <div class="toggle-card" style="margin-top:4px;">
+            <div class="toggle-info">
+              <div class="toggle-title">Enable SL Cooldown</div>
+              <div class="toggle-desc">Aktifkan proteksi cooldown pasca SL</div>
+            </div>
+            <label class="toggle-control" for="cfg-slCooldownEnabled">
+              <input type="checkbox" id="cfg-slCooldownEnabled" class="toggle-input">
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </div>
+          <div class="form-group" style="margin-top:auto;">
+            <label class="form-label">Durasi Cooldown setelah SL (jam) <span class="form-label-hint">Rekomendasi 6–12h</span></label>
+            <input type="number" step="1" min="1" max="48" id="cfg-slCooldownHours" class="form-input" placeholder="6-12 jam">
+          </div>
+        </div>
+
+        <!-- Loss / Minus Cooldown Settings -->
+        <div class="cfg-subcard" style="background:rgba(239,68,68,0.04);border-color:rgba(239,68,68,0.25);">
+          <div class="cfg-subcard-header">
+            <div class="cfg-subcard-title" style="color:#f87171;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+              Loss / Minus Cooldown Rule
+            </div>
+            <span class="cfg-badge cfg-badge-red">New Rule</span>
+          </div>
+          <div class="cfg-subcard-desc">
+            Jika posisi ditutup dengan minus melebihi batas persen, bot memberikan cooldown otomatis pada pool &amp; token tersebut.
+          </div>
+          <div class="toggle-card" style="margin-top:4px;">
+            <div class="toggle-info">
+              <div class="toggle-title">Enable Loss Cooldown</div>
+              <div class="toggle-desc">Aktifkan cooldown saat kerugian melebihi threshold</div>
+            </div>
+            <label class="toggle-control" for="cfg-lossCooldownEnabled">
+              <input type="checkbox" id="cfg-lossCooldownEnabled" class="toggle-input">
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto;">
+            <div class="form-group">
+              <label class="form-label">Batas Minus (%) <span class="form-label-hint">e.g. 3%</span></label>
+              <input type="number" step="0.5" min="0.1" id="cfg-lossCooldownPct" class="form-input" placeholder="3">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cooldown (jam) <span class="form-label-hint">e.g. 3h</span></label>
+              <input type="number" step="0.5" min="0.1" max="168" id="cfg-lossCooldownHours" class="form-input" placeholder="3">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </form>
+</div>

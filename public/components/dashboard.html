@@ -34,27 +34,42 @@
             </div>
           </div>
 
-          <!-- Portfolio Trend Line Chart -->
-          <div class="panel" style="margin-bottom: 24px; padding: 20px; position: relative;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-              <div style="display:flex; align-items:center; gap:16px;">
+          <!-- PnL Calendar Section -->
+          <div class="panel pnl-calendar-panel" style="margin-bottom: 24px; padding: 20px; position: relative;">
+            <!-- Header & Navigation -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <div class="section-dot" style="background:var(--accent-light);"></div>
-                  <span style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.05em;">SOL Balance Trend</span>
+                  <div class="section-dot" style="background:var(--success);"></div>
+                  <span style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.05em;">PnL Calendar</span>
                 </div>
-                <!-- Timeframe Toggles -->
-                <div class="timeframe-toggles" style="display:flex; background:rgba(255,255,255,0.05); border-radius:6px; padding:2px; border:1px solid rgba(255,255,255,0.08);">
-                  <button type="button" class="tf-btn" id="tf-1d" onclick="setChartTimeframe('1D')" style="background:none; border:none; color:var(--text-muted); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">1D</button>
-                  <button type="button" class="tf-btn" id="tf-7d" onclick="setChartTimeframe('7D')" style="background:var(--accent-light); border:none; color:#fff; font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">7D</button>
-                  <button type="button" class="tf-btn" id="tf-30d" onclick="setChartTimeframe('30D')" style="background:none; border:none; color:var(--text-muted); font-size:10px; font-weight:700; padding:4px 8px; border-radius:4px; cursor:pointer; font-family:'Space Grotesk',sans-serif; transition:all 0.15s ease;">30D</button>
+                <!-- Month Nav Controls -->
+                <div style="display:flex; align-items:center; background:rgba(255,255,255,0.05); border-radius:8px; padding:2px; border:1px solid rgba(255,255,255,0.08); gap:4px;">
+                  <button type="button" class="cal-nav-btn" onclick="prevPnlMonth()" title="Previous Month" style="background:none; border:none; color:var(--text-secondary); width:28px; height:26px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  <span id="pnl-cal-month-title" style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; color:#fff; min-width:125px; text-align:center; padding:0 4px;">--</span>
+                  <button type="button" class="cal-nav-btn" onclick="nextPnlMonth()" title="Next Month" style="background:none; border:none; color:var(--text-secondary); width:28px; height:26px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s ease;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </button>
                 </div>
+                <button type="button" onclick="goToTodayPnlMonth()" class="btn-ghost btn-sm" style="font-size:10px; padding:4px 10px; border-radius:6px; font-weight:700; height:28px; font-family:'Space Grotesk',sans-serif;">Today</button>
               </div>
-              <span id="chart-current-value" style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:#fff; text-align:right;">
-                -- SOL
-              </span>
+
+              <!-- Month Summary Badges -->
+              <div id="pnl-cal-month-summary" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <!-- Injected dynamically: Monthly Net PnL, Winrate, Green/Red days -->
+              </div>
             </div>
-            <div id="portfolio-chart-container" style="width:100%; height:200px; position:relative;">
-              <!-- Responsive SVG Chart will be injected here -->
+
+            <!-- Month Quick Stats Cards -->
+            <div id="pnl-cal-stats-strip" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;">
+              <!-- Dynamic stat pills: Net PnL, Winrate, Green/Red, Fees, Best Day -->
+            </div>
+
+            <!-- Calendar Grid Container -->
+            <div id="pnl-calendar-container" style="width:100%; position:relative; min-height:260px;">
+              <!-- Calendar Weekday Headers + Day Grid injected here -->
             </div>
           </div>
 

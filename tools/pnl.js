@@ -1,8 +1,11 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { config } from "../config.js";
 import { log } from "../logger.js";
+import fs from "fs";
+import { repoPath } from "../repo-root.js";
 import {
   getTrackedPosition,
+  trackPosition,
   markOutOfRange,
   markInRange,
   minutesOutOfRange,
@@ -19,6 +22,8 @@ import {
 const JUP_SEARCH = "https://datapi.jup.ag/v1/assets/search";
 const METEORA_PNL = "https://dlmm.datapi.meteora.ag/positions";
 
+import { getConnection } from "./rpc.js";
+
 // Lazy SDK load — mirrors tools/dlmm.js (CJS dir-imports break in ESM at import time).
 let _DLMM = null;
 async function loadDlmmSdk() {
@@ -31,10 +36,13 @@ async function loadDlmmSdk() {
 
 let _pnlConnection = null;
 export function getPnlConnection() {
-  if (!_pnlConnection) {
-    _pnlConnection = new Connection(config.pnl.rpcUrl, "confirmed");
+  if (config.pnl?.rpcUrl && config.pnl.rpcUrl !== "https://pump.helius-rpc.com") {
+    if (!_pnlConnection) {
+      _pnlConnection = new Connection(config.pnl.rpcUrl, "confirmed");
+    }
+    return _pnlConnection;
   }
-  return _pnlConnection;
+  return getConnection();
 }
 
 function safeNum(value) {
@@ -204,7 +212,27 @@ function buildPosition(f, prices, solUsd, meteora, solMode) {
   if (inRange) markInRange(f.position);
   else markOutOfRange(f.position);
 
-  const tracked = getTrackedPosition(f.position);
+  let tracked = getTrackedPosition(f.position);
+  if (!tracked) {
+    let resolvedPair = (meteora?.tokenX && meteora?.tokenY) ? `${meteora.tokenX}/${meteora.tokenY}` : null;
+    if (!resolvedPair) {
+      try {
+        const db = JSON.parse(fs.readFileSync(repoPath("pool-memory.json"), "utf8"));
+        if (db[f.pool]?.name) resolvedPair = db[f.pool].name;
+      } catch {}
+    }
+    trackPosition({
+      position: f.position,
+      pool: f.pool,
+      pool_name: resolvedPair || (f.baseMint ? `${f.baseMint.slice(0, 4)}/SOL` : `${f.pool.slice(0, 8)}/SOL`),
+      strategy: "bid_ask",
+      bin_range: { min: f.lower ?? 0, max: f.upper ?? 0 },
+      base_mint: f.baseMint,
+      amount_sol: balancesSol || 0.3,
+      deployed_at: meteora?.createdAt ? new Date(meteora.createdAt * 1000).toISOString() : new Date().toISOString(),
+    });
+    tracked = getTrackedPosition(f.position);
+  }
   const ageFromState = tracked?.deployed_at
     ? Math.floor((Date.now() - new Date(tracked.deployed_at).getTime()) / 60000)
     : null;
@@ -213,7 +241,7 @@ function buildPosition(f, prices, solUsd, meteora, solMode) {
   return {
     position:           f.position,
     pool:               f.pool,
-    pair:               tracked?.pool_name || (meteora ? `${meteora.tokenX ?? "?"}/${meteora.tokenY ?? "SOL"}` : "?/SOL"),
+    pair:               tracked?.pool_name || (meteora?.tokenX && meteora?.tokenY ? `${meteora.tokenX}/${meteora.tokenY}` : (f.baseMint ? `${f.baseMint.slice(0, 4)}/SOL` : `${f.pool.slice(0, 8)}/SOL`)),
     base_mint:          f.baseMint,
     lower_bin:          f.lower ?? tracked?.bin_range?.min ?? null,
     upper_bin:          f.upper ?? tracked?.bin_range?.max ?? null,
@@ -267,6 +295,16 @@ export async function computePositions(walletAddress) {
     const decimalMultiplier = Math.pow(10, decX - decY);
     for (const p of info?.lbPairPositionsData || []) {
       const d = p.positionData || {};
+      const xRaw = d.totalXAmount;
+      const yRaw = d.totalYAmount;
+      const feeXRaw = d.feeX?.toString?.() ?? d.feeX ?? 0;
+      const feeYRaw = d.feeY?.toString?.() ?? d.feeY ?? 0;
+
+      // Filter out ghost / empty positions (zero liquidity and zero uncollected fees)
+      if (safeNum(xRaw) === 0 && safeNum(yRaw) === 0 && safeNum(feeXRaw) === 0 && safeNum(feeYRaw) === 0) {
+        continue;
+      }
+
       flat.push({
         position: p.publicKey.toString(),
         pool: lbPairKey,
@@ -276,10 +314,10 @@ export async function computePositions(walletAddress) {
         active,
         lower: d.lowerBinId ?? null,
         upper: d.upperBinId ?? null,
-        xRaw: d.totalXAmount,
-        yRaw: d.totalYAmount,
-        feeXRaw: d.feeX?.toString?.() ?? d.feeX ?? 0,
-        feeYRaw: d.feeY?.toString?.() ?? d.feeY ?? 0,
+        xRaw,
+        yRaw,
+        feeXRaw,
+        feeYRaw,
         binStep,
         decimalMultiplier,
       });
@@ -296,7 +334,13 @@ export async function computePositions(walletAddress) {
   ]);
   const solUsd = prices[SOL_MINT] ?? null;
 
-  const positions = flat.map((f) => buildPosition(f, prices, solUsd, meteoraByPosition[f.position], solMode));
+  const allPositions = flat.map((f) => buildPosition(f, prices, solUsd, meteoraByPosition[f.position], solMode));
+  const positions = allPositions.filter((p) => {
+    const hasValue = (p.total_value_usd != null && p.total_value_usd > 0) || (p.total_value_true_usd != null && p.total_value_true_usd > 0);
+    const hasFees = (p.unclaimed_fees_usd != null && p.unclaimed_fees_usd > 0) || (p.unclaimed_fees_true_usd != null && p.unclaimed_fees_true_usd > 0);
+    return hasValue || hasFees;
+  });
 
   return { wallet: walletAddress, total_positions: positions.length, positions, source: "rpc" };
 }
+

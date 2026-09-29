@@ -146,3 +146,68 @@
       <button type="button" onclick="document.getElementById('filter-check-modal').close()" class="btn-ghost">Tutup</button>
     </div>
   </dialog>
+
+  <!-- PnL Calendar Day Detail Modal -->
+  <dialog id="pnl-day-modal" class="meridian-modal" style="max-width:680px;width:95vw;">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="modal-title" id="pnl-day-modal-title">PnL Detail</div>
+        <span id="pnl-day-modal-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;"></span>
+      </div>
+      <div class="modal-subtitle" id="pnl-day-modal-subtitle">Performance breakdown for closed positions on this date</div>
+    </div>
+    <div class="modal-body" style="padding:16px 20px; display:flex; flex-direction:column; gap:16px; max-height:68vh; overflow-y:auto;">
+      <!-- Day Summary Stats -->
+      <div id="pnl-day-modal-stats" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+      </div>
+      <!-- Trades Table/Cards -->
+      <div>
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:8px;">Closed Positions / Realized Trades</div>
+        <div id="pnl-day-modal-trades" style="display:flex; flex-direction:column; gap:8px;">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="document.getElementById('pnl-day-modal').close()" class="btn-ghost">Close</button>
+    </div>
+  </dialog>
+
+  <!-- RPC Detail Popup Modal -->
+  <dialog id="rpc-detail-modal" class="meridian-modal" style="max-width:840px;width:95vw;">
+    <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+      <div>
+        <div class="modal-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span>Detail Status Solana RPC &amp; API Key</span>
+          <span id="cfg-rpc-modal-badge" class="cfg-badge cfg-badge-green" style="font-size:11px;">Active: Memuat...</span>
+        </div>
+        <div class="modal-subtitle">Daftar endpoint RPC, urutan prioritas failover, sisa countdown cooldown, dan status koneksi live.</div>
+      </div>
+      <button type="button" onclick="closeRpcDetailModal()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;max-height:65vh;overflow-y:auto;">
+      <div style="overflow-x:auto;border:1px solid rgba(255,255,255,0.06);border-radius:10px;background:rgba(0,0,0,0.25);">
+        <table class="data-table" style="margin:0;width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="width:130px;padding:10px 14px;">Status</th>
+              <th style="padding:10px 14px;">Endpoint / Provider</th>
+              <th style="padding:10px 14px;">Masked URL</th>
+              <th style="padding:10px 14px;min-width:200px;">Cooldown &amp; Catatan</th>
+            </tr>
+          </thead>
+          <tbody id="cfg-rpc-tbody">
+            <tr>
+              <td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px;">Memuat status RPC...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;">
+      <button type="button" id="btn-probe-rpc-modal" onclick="probeRpcEndpoints()" class="btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Tes Latensi &amp; Status RPC
+      </button>
+      <button type="button" onclick="closeRpcDetailModal()" class="btn-ghost">Tutup</button>
+    </div>
+  </dialog>

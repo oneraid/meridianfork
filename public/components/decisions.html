@@ -20,7 +20,7 @@
           </div>
 
           <!-- Screened Candidate Pools -->
-          <div class="section-header">
+          <div class="section-header" style="margin-bottom: 12px;">
             <div>
               <div class="section-title" style="margin-bottom:4px;">
                 <div class="section-dot"></div>
@@ -33,7 +33,23 @@
               Refresh Candidates
             </button>
           </div>
-          <div class="panel" style="overflow:hidden; margin-bottom:32px;">
+
+          <!-- Candidate Tabs -->
+          <div class="cand-tabs-bar">
+            <button type="button" id="tab-btn-cand-passed" class="cand-tab-btn active" onclick="switchCandidateTab('passed')">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              <span>Passed Candidates</span>
+              <span id="badge-cand-passed-count" class="cand-badge-count badge-green">0</span>
+            </button>
+            <button type="button" id="tab-btn-cand-filtered" class="cand-tab-btn" onclick="switchCandidateTab('filtered')">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span>Filtered / Rejected Pools</span>
+              <span id="badge-cand-filtered-count" class="cand-badge-count badge-red">0</span>
+            </button>
+          </div>
+
+          <!-- Passed Candidates Panel -->
+          <div id="panel-cand-passed" class="panel" style="overflow:hidden; margin-bottom:32px;">
             <table class="data-table">
               <thead>
                 <tr>
@@ -47,6 +63,23 @@
                 </tr>
               </thead>
               <tbody id="screener-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Filtered / Rejected Pools Panel -->
+          <div id="panel-cand-filtered" class="panel" style="overflow:hidden; margin-bottom:32px; display:none;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Token / Pool Details</th>
+                  <th>Rejection Reason</th>
+                  <th>Volume / TVL</th>
+                  <th>Fee / Volatility</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="screener-filtered-table-body"></tbody>
             </table>
           </div>
 

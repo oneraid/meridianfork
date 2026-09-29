@@ -98,6 +98,8 @@ export const config = {
     blockedLaunchpads:  u.blockedLaunchpads  ?? [],  // e.g. ["letsbonk.fun", "pump.fun"]
     minTokenAgeHours:   u.minTokenAgeHours   ?? null, // null = no minimum
     maxTokenAgeHours:   u.maxTokenAgeHours   ?? null, // null = no maximum
+    minPctBelowAth:     u.minPctBelowAth !== undefined ? u.minPctBelowAth : 30,
+    athSource:          u.athSource          || "meteora", // meteora | gmgn | both
   },
 
   // ─── Position Management ────────────────
@@ -121,6 +123,10 @@ export const config = {
     // Stop-Loss Cooldown — prevents re-entry into pool/token that just hit SL
     slCooldownEnabled:     u.slCooldownEnabled     ?? true,
     slCooldownHours:       u.slCooldownHours       ?? 8,
+    // Loss Cooldown — prevents re-entry into pool/token if position closed with loss > X%
+    lossCooldownEnabled:   u.lossCooldownEnabled   ?? true,
+    lossCooldownPct:       u.lossCooldownPct       ?? 3,
+    lossCooldownHours:     u.lossCooldownHours     ?? 3,
     minFeePerTvl24h:       u.minFeePerTvl24h       ?? 7,
     minAgeBeforeYieldCheck: u.minAgeBeforeYieldCheck ?? 60, // minutes before low yield can trigger close
     minSolToOpen:          u.minSolToOpen          ?? 0.55,
@@ -325,6 +331,8 @@ export function reloadScreeningThresholds() {
     if (fresh.maxBotHoldersPct  != null) s.maxBotHoldersPct = fresh.maxBotHoldersPct;
     if (fresh.allowedLaunchpads !== undefined) s.allowedLaunchpads = fresh.allowedLaunchpads;
     if (fresh.blockedLaunchpads !== undefined) s.blockedLaunchpads = fresh.blockedLaunchpads;
+    if (fresh.minPctBelowAth !== undefined) s.minPctBelowAth = fresh.minPctBelowAth;
+    if (fresh.athSource !== undefined) s.athSource = fresh.athSource;
     const minBinsBelow = numericConfig(fresh.minBinsBelow) ?? config.strategy.minBinsBelow;
     const maxBinsBelow = numericConfig(fresh.maxBinsBelow) ?? numericConfig(fresh.binsBelow) ?? config.strategy.maxBinsBelow;
     const defaultBinsBelow = numericConfig(fresh.defaultBinsBelow) ?? numericConfig(fresh.binsBelow) ?? config.strategy.defaultBinsBelow ?? maxBinsBelow;

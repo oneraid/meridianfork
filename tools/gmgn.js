@@ -93,21 +93,57 @@ function num(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+const tokenInfoCache = new Map();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+// ─── Complete Token Info (with caching) ────────────────────────
+export async function getGmgnTokenInfo(mint) {
+  if (!mint || !hasGmgnApiKey()) return null;
+
+  const cached = tokenInfoCache.get(mint);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  try {
+    const payload = await gmgnFetch("/v1/token/info", { params: { chain: "sol", address: mint } });
+    const info = payload?.data?.data || payload?.data || payload;
+    if (info && typeof info === "object") {
+      tokenInfoCache.set(mint, { data: info, timestamp: Date.now() });
+      return info;
+    }
+  } catch (error) {
+    log("gmgn", `token info lookup failed for ${String(mint).slice(0, 8)}: ${error.message}`);
+  }
+
+  if (cached) {
+    log("gmgn", `Using stale cached GMGN data for ${String(mint).slice(0, 8)} after API error`);
+    return cached.data;
+  }
+  return null;
+}
+
 // ─── Token fees (SOL) for the minTokenFeesSol gate ──────────────
 // Returns { total_fee, trade_fee } in SOL, or null on missing key / error
 // so callers can fall back to Jupiter's fee figure.
 export async function getGmgnTokenFees(mint) {
-  if (!mint || !hasGmgnApiKey()) return null;
-  try {
-    const payload = await gmgnFetch("/v1/token/info", { params: { chain: "sol", address: mint } });
-    const info = payload?.data?.data || payload?.data || payload;
-    if (!info || typeof info !== "object") return null;
-    return {
-      total_fee: num(info.total_fee),
-      trade_fee: num(info.trade_fee),
-    };
-  } catch (error) {
-    log("gmgn", `token fees lookup failed for ${String(mint).slice(0, 8)}: ${error.message}`);
-    return null;
-  }
+  const info = await getGmgnTokenInfo(mint);
+  if (!info) return null;
+  return {
+    total_fee: num(info.total_fee),
+    trade_fee: num(info.trade_fee),
+  };
 }
+
+// ─── Token ATH and Price (USD) for the minPctBelowAth gate ──────
+// Returns { ath_price, price } in USD, or null on missing key / error.
+export async function getGmgnTokenAthAndPrice(mint) {
+  const info = await getGmgnTokenInfo(mint);
+  if (!info) return null;
+  const currentPrice = info.price?.price != null ? num(info.price.price) : num(info.price);
+  return {
+    ath_price: num(info.ath_price),
+    price: currentPrice,
+  };
+}
+

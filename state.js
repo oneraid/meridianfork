@@ -184,12 +184,28 @@ function pushEvent(state, event) {
 /**
  * Mark a position as closed.
  */
-export function recordClose(position_address, reason) {
+export function recordClose(position_address, reason, meta = {}) {
   const state = load();
-  const pos = state.positions[position_address];
-  if (!pos) return;
+  let pos = state.positions[position_address];
+  if (!pos) {
+    pos = {
+      position: position_address,
+      pool: meta.pool || null,
+      pool_name: meta.pool_name || null,
+      base_mint: meta.base_mint || null,
+      closed: true,
+      closed_at: new Date().toISOString(),
+      notes: [],
+      close_reason: reason,
+    };
+    state.positions[position_address] = pos;
+  }
+  if (meta.pool && !pos.pool) pos.pool = meta.pool;
+  if (meta.pool_name && (!pos.pool_name || pos.pool_name === "?/SOL")) pos.pool_name = meta.pool_name;
+  if (meta.base_mint && !pos.base_mint) pos.base_mint = meta.base_mint;
   pos.closed = true;
-  pos.closed_at = new Date().toISOString();
+  pos.closed_at = pos.closed_at || new Date().toISOString();
+  pos.close_reason = reason;
   pos.notes.push(`Closed at ${pos.closed_at}: ${reason}`);
   pushEvent(state, { action: "close", position: position_address, pool_name: pos.pool_name || pos.pool, reason });
   save(state);
@@ -492,8 +508,16 @@ export function syncOpenPositions(active_addresses) {
  */
 export function updateClosedPnL(position_address, pnl_pct, pnl_usd, fees_usd) {
   const state = load();
-  const pos = state.positions[position_address];
-  if (!pos) return;
+  let pos = state.positions[position_address];
+  if (!pos) {
+    pos = {
+      position: position_address,
+      closed: true,
+      closed_at: new Date().toISOString(),
+      notes: [],
+    };
+    state.positions[position_address] = pos;
+  }
   if (pnl_pct !== null && pnl_pct !== undefined) pos.close_pnl_pct = pnl_pct;
   if (pnl_usd !== null && pnl_usd !== undefined) pos.close_pnl_usd = pnl_usd;
   if (fees_usd !== null && fees_usd !== undefined) pos.total_fees_claimed_usd = fees_usd;

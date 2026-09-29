@@ -12,6 +12,7 @@ import { REPO_ROOT, repoPath } from "./repo-root.js";
 import { getTrackedPositions, recordPortfolioSnapshot, getPortfolioHistory } from "./state.js";
 import { Connection } from "@solana/web3.js";
 import { listStrategies, setActiveStrategy } from "./strategy-library.js";
+import { rpcManager, getConnection } from "./tools/rpc.js";
 
 let apiStatusCache = null;
 let apiStatusCacheTime = 0;
@@ -31,16 +32,13 @@ async function checkApiConnections() {
 
   // 1. RPC
   try {
-    if (process.env.RPC_URL) {
-      const connection = new Connection(process.env.RPC_URL, "confirmed");
-      const slot = await Promise.race([
-        connection.getSlot(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
-      ]);
-      results.rpc = { connected: true, detail: `Connected (Slot: ${slot})` };
-    } else {
-      results.rpc = { connected: false, detail: "RPC_URL missing" };
-    }
+    const connection = getConnection();
+    const activeEp = rpcManager.getActiveEndpoint();
+    const slot = await Promise.race([
+      connection.getSlot(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+    ]);
+    results.rpc = { connected: true, detail: `${activeEp?.name || "Connected"} (Slot: ${slot})` };
   } catch (e) {
     results.rpc = { connected: false, detail: e.message };
   }
@@ -112,6 +110,7 @@ async function checkApiConnections() {
 // Session store in memory: token -> { expires, csrfToken }
 const sessions = new Map();
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
+let lastKnownSolPrice = 0;
 
 export function startDashboardServer(context = {}) {
   const app = express();
@@ -213,6 +212,7 @@ export function startDashboardServer(context = {}) {
       const livePositions = await getMyPositions().catch(() => ({ positions: [], total_positions: 0 }));
       const positionsVal = (livePositions?.positions || []).reduce((sum, p) => sum + (Number(p.total_value_usd) || 0), 0);
       const solPrice = Number(balances.sol_price) || 0;
+      if (solPrice > 0) lastKnownSolPrice = solPrice;
       const walletVal = Number(balances.sol_usd) || (Number(balances.sol) * solPrice);
       const totalPortfolioValue = walletVal + positionsVal;
       const totalPortfolioValueSol = solPrice > 0 ? (totalPortfolioValue / solPrice) : Number(balances.sol);
@@ -298,7 +298,8 @@ export function startDashboardServer(context = {}) {
             if (item.position) {
               performanceMap[item.position] = {
                 pnl_usd: item.pnl_usd,
-                pnl_pct: item.pnl_pct
+                pnl_pct: item.pnl_pct,
+                base_mint: item.base_mint || null
               };
             }
           }
@@ -313,7 +314,8 @@ export function startDashboardServer(context = {}) {
         return {
           ...p,
           close_pnl_pct: perf.pnl_pct ?? p.close_pnl_pct ?? p.peak_pnl_pct ?? 0,
-          close_pnl_usd: perf.pnl_usd ?? p.close_pnl_usd ?? 0
+          close_pnl_usd: perf.pnl_usd ?? p.close_pnl_usd ?? 0,
+          base_mint: p.base_mint || perf.base_mint || p.signal_snapshot?.base_mint || null
         };
       });
 
@@ -506,6 +508,147 @@ export function startDashboardServer(context = {}) {
     }
   });
 
+  app.get("/api/pnl/calendar", requireAuth, (req, res) => {
+    try {
+      // 1. Gather closed positions from state.json
+      const allTracked = getTrackedPositions(false);
+      const closedPositions = allTracked.filter(p => p.closed);
+
+      // 2. Gather performance records from lessons.json
+      let perfList = [];
+      try {
+        const lessonsPath = repoPath("lessons.json");
+        if (fs.existsSync(lessonsPath)) {
+          const lessonsData = JSON.parse(fs.readFileSync(lessonsPath, "utf8"));
+          perfList = lessonsData.performance || [];
+        }
+      } catch (err) {
+        log("server_error", `Failed to read lessons.json for calendar: ${err.message}`);
+      }
+
+      // 3. Merge & deduplicate by position address
+      const tradeMap = new Map();
+
+      // Process lessons performance first
+      for (const item of perfList) {
+        const id = item.position || `${item.pool}_${item.recorded_at}`;
+        const dateStr = item.recorded_at || item.created_at;
+        tradeMap.set(id, {
+          id,
+          position: item.position || "",
+          pool_name: item.pool_name || item.pool || "unknown",
+          pool: item.pool || "",
+          date: dateStr,
+          pnl_usd: Number(item.pnl_usd || 0),
+          pnl_pct: Number(item.pnl_pct || 0),
+          fees_usd: Number(item.fees_earned_usd || 0),
+          minutes_held: item.minutes_held ? Math.round(item.minutes_held) : null,
+          close_reason: item.close_reason || "Position closed",
+          initial_value_usd: item.initial_value_usd || null,
+          final_value_usd: item.final_value_usd || null,
+        });
+      }
+
+      // Overlay/add state.json closed positions (contains latest on-chain close data)
+      for (const pos of closedPositions) {
+        const id = pos.position || `${pos.pool}_${pos.closed_at}`;
+        const existing = tradeMap.get(id);
+        const dateStr = pos.closed_at || pos.deployed_at || (existing ? existing.date : null);
+        const pnlUsd = existing?.pnl_usd ?? Number(pos.close_pnl_usd || 0);
+        const pnlPct = existing?.pnl_pct ?? Number(pos.close_pnl_pct || pos.peak_pnl_pct || 0);
+        const feesUsd = (existing?.fees_usd && existing.fees_usd > 0) ? existing.fees_usd : Number(pos.total_fees_claimed_usd || 0);
+
+        tradeMap.set(id, {
+          id,
+          position: pos.position || "",
+          pool_name: pos.pool_name || pos.pool || (existing ? existing.pool_name : "unknown"),
+          pool: pos.pool || (existing ? existing.pool : ""),
+          date: dateStr,
+          pnl_usd: pnlUsd,
+          pnl_pct: pnlPct,
+          fees_usd: feesUsd,
+          minutes_held: existing?.minutes_held || (pos.deployed_at && pos.closed_at ? Math.round((new Date(pos.closed_at) - new Date(pos.deployed_at)) / 60000) : null),
+          close_reason: existing?.close_reason || pos.notes?.[pos.notes.length - 1] || "Closed",
+          initial_value_usd: existing?.initial_value_usd || pos.initial_value_usd || null,
+          final_value_usd: existing?.final_value_usd || null,
+        });
+      }
+
+      // 4. Group by Date (YYYY-MM-DD)
+      const daily = {};
+      let totalPnl = 0;
+      let totalFees = 0;
+      let totalWins = 0;
+      let totalLosses = 0;
+
+      for (const trade of tradeMap.values()) {
+        if (!trade.date) continue;
+        const d = new Date(trade.date);
+        if (isNaN(d.getTime())) continue;
+
+        // Group by YYYY-MM-DD
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const dayKey = `${year}-${month}-${day}`;
+
+        if (!daily[dayKey]) {
+          daily[dayKey] = {
+            date: dayKey,
+            pnl_usd: 0,
+            fees_usd: 0,
+            trades_count: 0,
+            wins: 0,
+            losses: 0,
+            trades: [],
+          };
+        }
+
+        daily[dayKey].pnl_usd += trade.pnl_usd;
+        daily[dayKey].fees_usd += trade.fees_usd;
+        daily[dayKey].trades_count += 1;
+
+        if (trade.pnl_usd > 0 || (trade.pnl_usd === 0 && trade.pnl_pct >= 0)) {
+          daily[dayKey].wins += 1;
+          totalWins += 1;
+        } else {
+          daily[dayKey].losses += 1;
+          totalLosses += 1;
+        }
+
+        daily[dayKey].trades.push(trade);
+        totalPnl += trade.pnl_usd;
+        totalFees += trade.fees_usd;
+      }
+
+      // Sort trades inside each day newest first
+      for (const dayKey in daily) {
+        daily[dayKey].pnl_usd = parseFloat(daily[dayKey].pnl_usd.toFixed(2));
+        daily[dayKey].fees_usd = parseFloat(daily[dayKey].fees_usd.toFixed(4));
+        daily[dayKey].trades.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      }
+
+      const totalTrades = totalWins + totalLosses;
+      const winRate = totalTrades > 0 ? parseFloat(((totalWins / totalTrades) * 100).toFixed(1)) : 0;
+
+      res.json({
+        success: true,
+        daily,
+        sol_price: lastKnownSolPrice || 0,
+        allTime: {
+          total_pnl_usd: parseFloat(totalPnl.toFixed(2)),
+          total_fees_usd: parseFloat(totalFees.toFixed(2)),
+          total_trades: totalTrades,
+          wins: totalWins,
+          losses: totalLosses,
+          win_rate: winRate,
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/api/config", requireAuth, (req, res) => {
     // Return editable parameters
     res.json({
@@ -517,7 +660,24 @@ export function startDashboardServer(context = {}) {
       strategy: config.strategy,
       pnl: config.pnl,
       opportunity: config.opportunity,
+      indicators: config.indicators,
+      chartIndicators: config.indicators,
+      rpcStatus: rpcManager.getStatus(),
     });
+  });
+
+  app.get("/api/rpc/status", requireAuth, (req, res) => {
+    res.json(rpcManager.getStatus());
+  });
+
+  app.post("/api/rpc/probe", requireAuth, requireCsrf, async (req, res) => {
+    try {
+      log("dashboard", "Manual RPC probe triggered via Web UI");
+      const result = await rpcManager.probeAllEndpoints();
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/config/update", requireAuth, requireCsrf, async (req, res) => {

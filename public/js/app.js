@@ -80,11 +80,7 @@
 
 // ─── Initial Triggers ───
 window.addEventListener("resize", () => {
-  if (dashboardState.portfolioHistory) {
-    renderPortfolioChart(dashboardState.portfolioHistory);
+  if (dashboardState.pnlCalendar && typeof renderPnlCalendar === "function") {
+    renderPnlCalendar();
   }
 });
-
-document.getElementById('content-area').addEventListener('touchstart', closeMoreMenu, { passive: true });
-
-checkSession();

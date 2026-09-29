@@ -8,14 +8,9 @@ import {
 import bs58 from "bs58";
 import { log } from "../logger.js";
 import { config } from "../config.js";
+import { getConnection } from "./rpc.js";
 
-let _connection = null;
 let _wallet = null;
-
-function getConnection() {
-  if (!_connection) _connection = new Connection(process.env.RPC_URL, "confirmed");
-  return _connection;
-}
 
 function getWallet() {
   if (!_wallet) {
@@ -52,51 +47,55 @@ function getJupiterReferralParams() {
   return { referralAccount, referralFee: Math.round(referralFee) };
 }
 
-/**
- * Get current wallet balances: SOL, USDC, and all SPL tokens using Helius Wallet API.
- * Returns USD-denominated values provided by Helius.
- */
-export async function getWalletBalances() {
-  let walletAddress;
+async function getWalletBalancesFromRpc(walletAddress) {
   try {
-    walletAddress = getWallet().publicKey.toString();
-  } catch {
-    return { wallet: null, sol: 0, sol_price: 0, sol_usd: 0, usdc: 0, tokens: [], total_usd: 0, error: "Wallet not configured" };
-  }
+    const connection = getConnection();
+    const pubkey = new PublicKey(walletAddress);
+    const balanceLamports = await connection.getBalance(pubkey);
+    const solBalance = balanceLamports / LAMPORTS_PER_SOL;
 
-  const HELIUS_KEY = process.env.HELIUS_API_KEY;
-  if (!HELIUS_KEY) {
-    log("wallet_error", "HELIUS_API_KEY not set in .env");
-    return { wallet: walletAddress, sol: 0, sol_price: 0, sol_usd: 0, usdc: 0, tokens: [], total_usd: 0, error: "Helius API key missing" };
-  }
+    // Get SOL price from Jupiter Price API
+    let solPrice = 0;
+    try {
+      const priceRes = await fetch("https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112", {
+        headers: getJupiterApiKey() ? { "x-api-key": getJupiterApiKey() } : {},
+      });
+      if (priceRes.ok) {
+        const priceData = await priceRes.json();
+        solPrice = Number(priceData?.data?.["So11111111111111111111111111111111111111112"]?.price || 0);
+      }
+    } catch {}
 
-  try {
-    const url = `https://api.helius.xyz/v1/wallet/${walletAddress}/balances?api-key=${HELIUS_KEY}`;
-    const res = await fetch(url);
-    
-    if (!res.ok) {
-      throw new Error(`Helius API error: ${res.status} ${res.statusText}`);
+    // Also get parsed token accounts (USDC and other SPL tokens)
+    let usdcBalance = 0;
+    const tokens = [];
+    try {
+      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
+        programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+      });
+
+      for (const item of tokenAccounts?.value || []) {
+        const info = item.account?.data?.parsed?.info;
+        const mint = info?.mint;
+        const amount = info?.tokenAmount?.uiAmount || 0;
+        if (amount > 0 && mint) {
+          if (mint === config.tokens.USDC) {
+            usdcBalance = amount;
+          }
+          tokens.push({
+            mint,
+            symbol: mint === config.tokens.USDC ? "USDC" : mint.slice(0, 8),
+            balance: amount,
+            usd: mint === config.tokens.USDC ? amount : null,
+          });
+        }
+      }
+    } catch (e) {
+      log("wallet_warn", `Failed to parse SPL token accounts: ${e.message}`);
     }
 
-    const data = await res.json();
-    const balances = data.balances || [];
-
-    // ─── Find SOL and USDC ────────────────────────────────────
-    const solEntry = balances.find(b => b.mint === config.tokens.SOL || b.symbol === "SOL");
-    const usdcEntry = balances.find(b => b.mint === config.tokens.USDC || b.symbol === "USDC");
-
-    const solBalance = solEntry?.balance || 0;
-    const solPrice = solEntry?.pricePerToken || 0;
-    const solUsd = solEntry?.usdValue || 0;
-    const usdcBalance = usdcEntry?.balance || 0;
-
-    // ─── Map all tokens ───────────────────────────────────────
-    const enrichedTokens = balances.map(b => ({
-      mint: b.mint,
-      symbol: b.symbol || b.mint.slice(0, 8),
-      balance: b.balance,
-      usd: b.usdValue ? Math.round(b.usdValue * 100) / 100 : null,
-    }));
+    const solUsd = solBalance * solPrice;
+    const totalUsd = solUsd + usdcBalance;
 
     return {
       wallet: walletAddress,
@@ -104,11 +103,11 @@ export async function getWalletBalances() {
       sol_price: Math.round(solPrice * 100) / 100,
       sol_usd: Math.round(solUsd * 100) / 100,
       usdc: Math.round(usdcBalance * 100) / 100,
-      tokens: enrichedTokens,
-      total_usd: Math.round((data.totalUsdValue || 0) * 100) / 100,
+      tokens,
+      total_usd: Math.round(totalUsd * 100) / 100,
     };
-  } catch (error) {
-    log("wallet_error", error.message);
+  } catch (err) {
+    log("wallet_error", `RPC balance lookup failed: ${err.message}`);
     return {
       wallet: walletAddress,
       sol: 0,
@@ -117,9 +116,101 @@ export async function getWalletBalances() {
       usdc: 0,
       tokens: [],
       total_usd: 0,
-      error: error.message,
+      error: err.message,
     };
   }
+}
+
+export async function getWalletBalances() {
+  let walletAddress;
+  try {
+    walletAddress = getWallet().publicKey.toString();
+  } catch {
+    return { wallet: null, sol: 0, sol_price: 0, sol_usd: 0, usdc: 0, tokens: [], total_usd: 0, error: "Wallet not configured" };
+  }
+
+  // Track Helius key status to auto-skip exhausted or cooling-down keys
+  if (!globalThis._heliusWalletKeyStatus) {
+    globalThis._heliusWalletKeyStatus = new Map();
+  }
+  const keyStatus = globalThis._heliusWalletKeyStatus;
+
+  // Build candidate Helius keys (primary + backups)
+  const heliusKeys = [];
+  if (process.env.HELIUS_API_KEY) heliusKeys.push(process.env.HELIUS_API_KEY.trim());
+  if (process.env.HELIUS_BACKUP_KEYS) {
+    process.env.HELIUS_BACKUP_KEYS.split(",").map(k => k.trim()).filter(Boolean).forEach(k => {
+      if (!heliusKeys.includes(k)) heliusKeys.push(k);
+    });
+  }
+
+  const now = Date.now();
+  // Filter candidate keys: prioritize those not exhausted and not currently cooling down
+  const nonExhaustedKeys = heliusKeys.filter(k => {
+    const s = keyStatus.get(k);
+    if (!s) return true;
+    return s.cooldownUntil <= now;
+  });
+
+  const keysToTry = nonExhaustedKeys.length > 0 ? nonExhaustedKeys : heliusKeys;
+
+  for (const key of keysToTry) {
+    try {
+      const url = `https://api.helius.xyz/v1/wallet/${walletAddress}/balances?api-key=${key}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "");
+        const isExhausted =
+          errorText.includes("max usage reached") ||
+          errorText.includes("quota exceeded") ||
+          errorText.includes("credits exhausted");
+        keyStatus.set(key, {
+          isExhausted,
+          cooldownUntil: now + (isExhausted ? 12 * 3600 * 1000 : 2 * 60 * 1000),
+        });
+        throw new Error(`Helius API error: ${res.status} ${errorText || res.statusText}`);
+      }
+
+      // Success: clear any failure status
+      keyStatus.delete(key);
+
+      const data = await res.json();
+      const balances = data.balances || [];
+
+      // ─── Find SOL and USDC ────────────────────────────────────
+      const solEntry = balances.find(b => b.mint === config.tokens.SOL || b.symbol === "SOL");
+      const usdcEntry = balances.find(b => b.mint === config.tokens.USDC || b.symbol === "USDC");
+
+      const solBalance = solEntry?.balance || 0;
+      const solPrice = solEntry?.pricePerToken || 0;
+      const solUsd = solEntry?.usdValue || 0;
+      const usdcBalance = usdcEntry?.balance || 0;
+
+      // ─── Map all tokens ───────────────────────────────────────
+      const enrichedTokens = balances.map(b => ({
+        mint: b.mint,
+        symbol: b.symbol || b.mint.slice(0, 8),
+        balance: b.balance,
+        usd: b.usdValue ? Math.round(b.usdValue * 100) / 100 : null,
+      }));
+
+      return {
+        wallet: walletAddress,
+        sol: Math.round(solBalance * 1e6) / 1e6,
+        sol_price: Math.round(solPrice * 100) / 100,
+        sol_usd: Math.round(solUsd * 100) / 100,
+        usdc: Math.round(usdcBalance * 100) / 100,
+        tokens: enrichedTokens,
+        total_usd: Math.round((data.totalUsdValue || 0) * 100) / 100,
+      };
+    } catch (error) {
+      log("wallet_warn", `Helius balance fetch with key ${key.slice(0, 6)}... failed (${error.message.slice(0, 80)}). Trying next...`);
+    }
+  }
+
+  // Fallback to Solana RPC / Alchemy connection if all Helius keys fail
+  log("wallet_warn", "All Helius API keys failed or rate-limited. Falling back to Solana RPC / Alchemy balance lookup...");
+  return await getWalletBalancesFromRpc(walletAddress);
 }
 
 /**

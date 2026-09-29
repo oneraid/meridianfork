@@ -194,6 +194,18 @@ function getRawPoolScreeningRejectReason(pool, s) {
     const minCreatedAt = Date.now() - s.maxTokenAgeHours * 3_600_000;
     if (createdAt == null || createdAt < minCreatedAt) return `token age above maxTokenAgeHours ${s.maxTokenAgeHours}`;
   }
+  if (s.minPctBelowAth != null && s.minPctBelowAth > 0) {
+    const athPrice = pool.ath_price;
+    const currentPrice = pool.current_price_gmgn;
+    if (athPrice != null && currentPrice != null && athPrice > 0) {
+      const pctBelowAth = ((athPrice - currentPrice) / athPrice) * 100;
+      if (pctBelowAth < s.minPctBelowAth) {
+        return `price is only ${pctBelowAth.toFixed(1)}% below ATH (required minPctBelowAth: ${s.minPctBelowAth}%, source: ${pool.ath_source})`;
+      }
+    } else {
+      return "could not resolve token ATH price or current price for ATH check";
+    }
+  }
   return null;
 }
 
@@ -338,6 +350,231 @@ async function enrichDiscordSignalLaunchpads(rawPools) {
     if (asset.marketCap != null && pool.token_x.market_cap == null) pool.token_x.market_cap = asset.marketCap;
     if (asset.createdAt != null && pool.token_x.created_at == null) pool.token_x.created_at = asset.createdAt;
     log("screening", `Discord signal launchpad enriched from Jupiter: ${pool.name || mint} — ${asset.launchpad}`);
+  }
+}
+
+export async function fetchMeteoraPoolAth(poolAddress, timeframe = "1h") {
+  if (!poolAddress) return null;
+  try {
+    const res = await fetch(`https://dlmm.datapi.meteora.ag/pools/${poolAddress}/ohlcv?timeframe=${encodeURIComponent(timeframe || "1h")}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const candles = json?.data || (Array.isArray(json) ? json : []);
+    if (!Array.isArray(candles) || candles.length === 0) return null;
+    const highs = candles.map((c) => Number(c.high)).filter((h) => Number.isFinite(h) && h > 0);
+    if (highs.length === 0) return null;
+    const athPrice = Math.max(...highs);
+    const latestCandle = candles[candles.length - 1];
+    const currentPrice = Number(latestCandle?.close || latestCandle?.open || 0);
+    return {
+      ath_price: athPrice,
+      price: currentPrice > 0 ? currentPrice : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function checkAthFilter(baseMint, poolDetail, minPctBelowAth, athSource = "meteora") {
+  if (minPctBelowAth == null || minPctBelowAth <= 0) {
+    return { pass: true };
+  }
+
+  const sourceSetting = String(athSource || "meteora").toLowerCase().trim();
+  const poolAddress = poolDetail?.pool_address || poolDetail?.address || poolDetail?.pool;
+  let athPrice = null;
+  let currentPrice = null;
+  let source = sourceSetting;
+
+  const { getGmgnTokenAthAndPrice, hasGmgnApiKey } = await import("./gmgn.js");
+  const useGmgn = (sourceSetting === "gmgn" || sourceSetting === "both") && hasGmgnApiKey() && Boolean(baseMint);
+
+  let gmgnInfo = null;
+  if (useGmgn) {
+    try {
+      gmgnInfo = await getGmgnTokenAthAndPrice(baseMint);
+    } catch (err) {
+      log("screening", `GMGN ATH check failed for ${baseMint.slice(0, 8)}: ${err.message}`);
+    }
+  }
+
+  let metInfo = null;
+  if (sourceSetting === "meteora" || sourceSetting === "both" || !gmgnInfo) {
+    if (poolAddress) {
+      metInfo = await fetchMeteoraPoolAth(poolAddress);
+    }
+  }
+
+  if (sourceSetting === "both") {
+    if (metInfo?.ath_price && metInfo.price && gmgnInfo?.ath_price && gmgnInfo.price) {
+      const metDrop = ((metInfo.ath_price - metInfo.price) / metInfo.ath_price) * 100;
+      const gmgnDrop = ((gmgnInfo.ath_price - gmgnInfo.price) / gmgnInfo.ath_price) * 100;
+      if (metDrop <= gmgnDrop) {
+        athPrice = metInfo.ath_price;
+        currentPrice = metInfo.price;
+        source = "meteora (both checked)";
+      } else {
+        athPrice = gmgnInfo.ath_price;
+        currentPrice = gmgnInfo.price;
+        source = "gmgn (both checked)";
+      }
+    } else if (metInfo?.ath_price && metInfo.price) {
+      athPrice = metInfo.ath_price;
+      currentPrice = metInfo.price;
+      source = "meteora (gmgn missing)";
+    } else if (gmgnInfo?.ath_price && gmgnInfo.price) {
+      athPrice = gmgnInfo.ath_price;
+      currentPrice = gmgnInfo.price;
+      source = "gmgn (meteora missing)";
+    }
+  } else if (sourceSetting === "meteora") {
+    if (metInfo?.ath_price && metInfo.price) {
+      athPrice = metInfo.ath_price;
+      currentPrice = metInfo.price;
+      source = "meteora";
+    } else if (gmgnInfo?.ath_price && gmgnInfo.price) {
+      athPrice = gmgnInfo.ath_price;
+      currentPrice = gmgnInfo.price;
+      source = "gmgn (meteora fallback)";
+    }
+  } else {
+    // GMGN
+    if (gmgnInfo?.ath_price && gmgnInfo.price) {
+      athPrice = gmgnInfo.ath_price;
+      currentPrice = gmgnInfo.price;
+      source = "gmgn";
+    } else if (metInfo?.ath_price && metInfo.price) {
+      athPrice = metInfo.ath_price;
+      currentPrice = metInfo.price;
+      source = "meteora (gmgn fallback)";
+    }
+  }
+
+  if (athPrice == null || currentPrice == null || athPrice <= 0) {
+    return {
+      pass: false,
+      reason: "Could not resolve token ATH price or current price.",
+    };
+  }
+
+  const pctBelowAth = ((athPrice - currentPrice) / athPrice) * 100;
+  const pass = pctBelowAth >= minPctBelowAth;
+
+  return {
+    pass,
+    pctBelowAth,
+    athPrice,
+    currentPrice,
+    source,
+  };
+}
+
+async function enrichAthDetails(rawPools, s) {
+  if (s.minPctBelowAth == null || s.minPctBelowAth <= 0) return;
+
+  const sourceSetting = String(s.athSource || "meteora").toLowerCase().trim();
+  const needGmgn = sourceSetting === "gmgn" || sourceSetting === "both";
+  const needMeteora = sourceSetting === "meteora" || sourceSetting === "both";
+
+  const { getGmgnTokenAthAndPrice, hasGmgnApiKey } = await import("./gmgn.js");
+  const useGmgn = needGmgn && hasGmgnApiKey();
+
+  const uniqueMints = [...new Set(rawPools.map(getPoolBaseMint).filter(Boolean))];
+  const uniquePools = [...new Set(rawPools.map((p) => p?.pool_address || p?.address || p?.pool).filter(Boolean))];
+
+  const gmgnResults = {};
+  if (useGmgn && uniqueMints.length > 0) {
+    const results = await Promise.allSettled(
+      uniqueMints.map(async (mint) => {
+        const res = await getGmgnTokenAthAndPrice(mint);
+        return { mint, res };
+      })
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.res) {
+        gmgnResults[r.value.mint] = r.value.res;
+      }
+    }
+  }
+
+  const meteoraResults = {};
+  if (needMeteora && uniquePools.length > 0) {
+    const metResults = await Promise.allSettled(
+      uniquePools.map(async (poolAddr) => {
+        const res = await fetchMeteoraPoolAth(poolAddr, s.timeframe || "1h");
+        return { poolAddr, res };
+      })
+    );
+    for (const r of metResults) {
+      if (r.status === "fulfilled" && r.value.res) {
+        meteoraResults[r.value.poolAddr] = r.value.res;
+      }
+    }
+  }
+
+  for (const pool of rawPools) {
+    if (!pool) continue;
+    const mint = getPoolBaseMint(pool);
+    const poolAddr = pool.pool_address || pool.address || pool.pool;
+    const gmgn = gmgnResults[mint];
+    const met = meteoraResults[poolAddr];
+
+    if (sourceSetting === "both") {
+      if (met?.ath_price != null && met.price != null && gmgn?.ath_price != null && gmgn.price != null) {
+        const metDrop = ((met.ath_price - met.price) / met.ath_price) * 100;
+        const gmgnDrop = ((gmgn.ath_price - gmgn.price) / gmgn.ath_price) * 100;
+        if (metDrop <= gmgnDrop) {
+          pool.ath_price = met.ath_price;
+          pool.current_price_gmgn = met.price;
+          pool.ath_source = "meteora (both checked)";
+        } else {
+          pool.ath_price = gmgn.ath_price;
+          pool.current_price_gmgn = gmgn.price;
+          pool.ath_source = "gmgn (both checked)";
+        }
+      } else if (met?.ath_price != null && met.price != null) {
+        pool.ath_price = met.ath_price;
+        pool.current_price_gmgn = met.price;
+        pool.ath_source = "meteora (gmgn missing)";
+      } else if (gmgn?.ath_price != null && gmgn.price != null) {
+        pool.ath_price = gmgn.ath_price;
+        pool.current_price_gmgn = gmgn.price;
+        pool.ath_source = "gmgn (meteora missing)";
+      } else {
+        pool.ath_price = pool.max_price != null ? numeric(pool.max_price) : null;
+        pool.current_price_gmgn = pool.pool_price != null ? numeric(pool.pool_price) : null;
+        pool.ath_source = "meteora_fallback";
+      }
+    } else if (sourceSetting === "meteora") {
+      if (met?.ath_price != null && met.price != null) {
+        pool.ath_price = met.ath_price;
+        pool.current_price_gmgn = met.price;
+        pool.ath_source = "meteora";
+      } else if (gmgn?.ath_price != null && gmgn.price != null) {
+        pool.ath_price = gmgn.ath_price;
+        pool.current_price_gmgn = gmgn.price;
+        pool.ath_source = "gmgn (meteora fallback)";
+      } else {
+        pool.ath_price = pool.max_price != null ? numeric(pool.max_price) : null;
+        pool.current_price_gmgn = pool.pool_price != null ? numeric(pool.pool_price) : null;
+        pool.ath_source = "meteora_fallback";
+      }
+    } else {
+      // GMGN
+      if (gmgn?.ath_price != null && gmgn.price != null) {
+        pool.ath_price = gmgn.ath_price;
+        pool.current_price_gmgn = gmgn.price;
+        pool.ath_source = "gmgn";
+      } else if (met?.ath_price != null && met.price != null) {
+        pool.ath_price = met.ath_price;
+        pool.current_price_gmgn = met.price;
+        pool.ath_source = "meteora (gmgn fallback)";
+      } else {
+        pool.ath_price = pool.max_price != null ? numeric(pool.max_price) : null;
+        pool.current_price_gmgn = pool.pool_price != null ? numeric(pool.pool_price) : null;
+        pool.ath_source = "meteora_fallback";
+      }
+    }
   }
 }
 
@@ -520,12 +757,27 @@ export async function discoverPools({
 
   rawPools = await applyVolatilityTimeframe(rawPools, s.timeframe);
   await enrichDiscordSignalLaunchpads(rawPools);
+  await enrichAthDetails(rawPools, s);
 
   const filteredExamples = [];
   const thresholdedRawPools = rawPools.filter((pool) => {
     const reason = getRawPoolScreeningRejectReason(pool, s);
     if (!reason) return true;
-    filteredExamples.push({ name: pool.name || pool.pool_address || "unknown pool", reason });
+    filteredExamples.push({
+      name: pool.name || pool.pool_address || "unknown pool",
+      pool: pool.pool_address || pool.pool || null,
+      base: {
+        symbol: pool.token_x?.symbol || (pool.name ? pool.name.split(/[\/\-]/)[0]?.trim() : null),
+        mint: pool.token_x?.address || pool.base_token_address || pool.base?.mint || null,
+      },
+      reason,
+      tvl: round(pool.tvl || pool.active_tvl || 0),
+      fee_active_tvl_ratio: pool.fee_active_tvl_ratio != null ? fix(pool.fee_active_tvl_ratio, 4) : fix(pool.fee_tvl_ratio, 4),
+      volume_window: round(pool.volume || pool.volume_window || pool.volume_24h || 0),
+      volatility: fix(pool.volatility, 4),
+      organic_score: Math.round(pool.token_x?.organic_score || pool.organic_score || 0),
+      launchpad: getPoolLaunchpad(pool),
+    });
     if (pool.discord_signal) log("screening", `Discord signal filtered: ${pool.name || pool.pool_address} — ${reason}`);
     return false;
   });
@@ -831,7 +1083,18 @@ function pushFilteredReason(list, pool, reason) {
   if (!list || !pool) return;
   list.push({
     name: pool.name || `${pool.base?.symbol || "?"}-${pool.quote?.symbol || "?"}`,
+    pool: pool.pool || pool.pool_address || null,
+    base: {
+      symbol: pool.base?.symbol || (pool.name ? pool.name.split(/[\/\-]/)[0]?.trim() : null),
+      mint: pool.base?.mint || pool.base_token_address || pool.token_x?.address || null,
+    },
     reason,
+    tvl: round(pool.tvl || pool.active_tvl || 0),
+    fee_active_tvl_ratio: pool.fee_active_tvl_ratio != null ? fix(pool.fee_active_tvl_ratio, 4) : fix(pool.fee_tvl_ratio, 4),
+    volume_window: round(pool.volume_window || pool.volume || 0),
+    volatility: fix(pool.volatility, 4),
+    organic_score: Math.round(pool.organic_score || pool.base?.organic || 0),
+    launchpad: pool.launchpad || null,
   });
 }
 
@@ -863,6 +1126,7 @@ export async function testScreeningFiltersForAddress(address) {
   }
   
   const processedPools = await applyVolatilityTimeframe(pools, timeframe);
+  await enrichAthDetails(processedPools, s);
   const results = [];
   
   const { getMyPositions } = await import("./dlmm.js");
@@ -981,6 +1245,25 @@ export async function testScreeningFiltersForAddress(address) {
         passed: !isPoolOnCooldown(pool.pool) && !isBaseMintOnCooldown(pool.base?.mint),
         value: isPoolOnCooldown(pool.pool) ? "Pool cooldown active" : isBaseMintOnCooldown(pool.base?.mint) ? "Token cooldown active" : "Clear",
         expected: "No active cooldowns"
+      },
+      {
+        name: "Percent Below ATH",
+        passed: (function() {
+          if (s.minPctBelowAth == null || s.minPctBelowAth <= 0) return true;
+          const athPrice = pool.ath_price;
+          const currentPrice = pool.current_price_gmgn;
+          if (athPrice == null || currentPrice == null || athPrice <= 0) return false;
+          const pctBelowAth = ((athPrice - currentPrice) / athPrice) * 100;
+          return pctBelowAth >= s.minPctBelowAth;
+        })(),
+        value: (function() {
+          const athPrice = pool.ath_price;
+          const currentPrice = pool.current_price_gmgn;
+          if (athPrice == null || currentPrice == null || athPrice <= 0) return "unknown";
+          const pctBelowAth = ((athPrice - currentPrice) / athPrice) * 100;
+          return `${pctBelowAth.toFixed(1)}% below ATH (${pool.ath_source || "unknown"})`;
+        })(),
+        expected: s.minPctBelowAth != null && s.minPctBelowAth > 0 ? `>= ${s.minPctBelowAth}%` : "No limit"
       }
     ];
 

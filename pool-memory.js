@@ -62,22 +62,30 @@ function isFeeGeneratingDeploy(deploy) {
 }
 
 function setPoolCooldown(entry, hours, reason) {
-  const cooldownUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-  entry.cooldown_until = cooldownUntil;
-  entry.cooldown_reason = reason;
-  return cooldownUntil;
+  const newUntilMs = Date.now() + hours * 60 * 60 * 1000;
+  const existingUntilMs = entry.cooldown_until ? new Date(entry.cooldown_until).getTime() : 0;
+  if (!existingUntilMs || newUntilMs > existingUntilMs) {
+    entry.cooldown_until = new Date(newUntilMs).toISOString();
+    entry.cooldown_reason = reason;
+  }
+  return entry.cooldown_until;
 }
 
 function setBaseMintCooldown(db, baseMint, hours, reason) {
   if (!baseMint) return null;
-  const cooldownUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  const newUntilMs = Date.now() + hours * 60 * 60 * 1000;
+  let result = null;
   for (const entry of Object.values(db)) {
     if (entry?.base_mint === baseMint) {
-      entry.base_mint_cooldown_until = cooldownUntil;
-      entry.base_mint_cooldown_reason = reason;
+      const existingUntilMs = entry.base_mint_cooldown_until ? new Date(entry.base_mint_cooldown_until).getTime() : 0;
+      if (!existingUntilMs || newUntilMs > existingUntilMs) {
+        entry.base_mint_cooldown_until = new Date(newUntilMs).toISOString();
+        entry.base_mint_cooldown_reason = reason;
+      }
+      result = entry.base_mint_cooldown_until;
     }
   }
-  return cooldownUntil;
+  return result || new Date(newUntilMs).toISOString();
 }
 
 // ─── Write ─────────────────────────────────────────────────────
@@ -182,6 +190,21 @@ export function recordPoolDeploy(poolAddress, deployData) {
     }
   }
 
+  // Set cooldown for loss threshold closes — if loss exceeds configured %, cooldown pool and token
+  if ((config.management.lossCooldownEnabled ?? true) && deploy.pnl_pct != null) {
+    const lossThreshold = Math.abs(Number(config.management.lossCooldownPct ?? 3));
+    const lossCooldownHrs = Number(config.management.lossCooldownHours ?? 3);
+    if (deploy.pnl_pct <= -lossThreshold && lossCooldownHrs > 0) {
+      const reason = `loss > ${lossThreshold}% (${deploy.pnl_pct}%)`;
+      const poolCd = setPoolCooldown(entry, lossCooldownHrs, reason);
+      const mintCd = setBaseMintCooldown(db, entry.base_mint, lossCooldownHrs, reason);
+      log("pool-memory", `Loss Cooldown set for ${entry.name} until ${poolCd} (${reason})`);
+      if (entry.base_mint && mintCd) {
+        log("pool-memory", `Loss Token cooldown set for ${entry.base_mint.slice(0, 8)} until ${mintCd} (${reason})`);
+      }
+    }
+  }
+
   // Set cooldown for low yield closes — pool wasn't profitable enough, don't redeploy soon
   if (deploy.close_reason === "low yield") {
     const cooldownHours = 4;
@@ -194,7 +217,8 @@ export function recordPoolDeploy(poolAddress, deployData) {
   const recentDeploys = entry.deploys.slice(-oorTriggerCount);
   const repeatedOorCloses =
     recentDeploys.length >= oorTriggerCount &&
-    recentDeploys.every((d) => isOorCloseReason(d.close_reason));
+    recentDeploys.every((d) => isOorCloseReason(d.close_reason)) &&
+    !recentDeploys.every((d) => d.pnl_pct > 0); /* skip cooldown if all profitable */
 
   if (repeatedOorCloses) {
     const reason = `repeated OOR closes (${oorTriggerCount}x)`;
@@ -212,13 +236,13 @@ export function recordPoolDeploy(poolAddress, deployData) {
     const rawScope = String(config.management.repeatDeployCooldownScope || "token").toLowerCase();
     const scope = ["pool", "token", "both"].includes(rawScope) ? rawScope : "token";
     const recentRepeatDeploys = entry.deploys.slice(-triggerCount);
-    const repeatedFeeGeneratingDeploys =
+    const repeatedNonFeeGeneratingDeploys =
       cooldownHours > 0 &&
       recentRepeatDeploys.length >= triggerCount &&
-      recentRepeatDeploys.every((d) => d.pnl_pct != null && isFeeGeneratingDeploy(d));
+      recentRepeatDeploys.every((d) => d.pnl_pct != null && !isFeeGeneratingDeploy(d));
 
-    if (repeatedFeeGeneratingDeploys) {
-      const reason = `repeat fee-generating deploys (${triggerCount}x)`;
+    if (repeatedNonFeeGeneratingDeploys) {
+      const reason = `repeat low-yield deploys (${triggerCount}x)`;
       if (scope === "pool" || scope === "both" || !entry.base_mint) {
         const poolCooldownUntil = setPoolCooldown(entry, cooldownHours, reason);
         log("pool-memory", `Cooldown set for ${entry.name} until ${poolCooldownUntil} (${reason})`);

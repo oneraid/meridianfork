@@ -7,6 +7,7 @@ import {
   getPositionPnl,
   claimFees,
   closePosition,
+  cleanGhostPositions,
   searchPools,
 } from "./dlmm.js";
 import { getWalletBalances, swapToken } from "./wallet.js";
@@ -165,6 +166,18 @@ async function validateDeployPoolThresholds(args) {
   }
 
   const baseMint = detail?.token_x?.address || detail?.base_token_address || null;
+  const minPctBelowAth = numberOrNull(config.screening.minPctBelowAth);
+  if (minPctBelowAth != null && minPctBelowAth > 0) {
+    const { checkAthFilter } = await import("./screening.js");
+    const athCheck = await checkAthFilter(baseMint, detail, minPctBelowAth);
+    if (!athCheck.pass) {
+      return {
+        pass: false,
+        reason: athCheck.reason || `Price is only ${athCheck.pctBelowAth?.toFixed(1)}% below ATH (required minPctBelowAth: ${minPctBelowAth}%, source: ${athCheck.source}).`,
+      };
+    }
+  }
+
   const entryMarketData = {
     entry_mcap: numberOrNull(detail?.token_x?.market_cap ?? detail?.base_token_market_cap),
     entry_tvl: tvl,
@@ -201,6 +214,9 @@ function coerceString(value, key) {
 }
 
 function coerceStringArray(value, key) {
+  if (typeof value === "string") {
+    return value.split(",").map((s) => s.trim()).filter(Boolean);
+  }
   if (!Array.isArray(value)) throw new Error(`${key} must be an array of strings`);
   return value.map((entry) => coerceString(entry, key)).filter(Boolean);
 }
@@ -216,8 +232,15 @@ function normalizeConfigValue(key, value) {
     "solMode",
     "darwinEnabled",
     "lpAgentRelayEnabled",
+    "opportunityPollEnabled",
+    "slCooldownEnabled",
+    "lossCooldownEnabled",
+    "repeatDeployCooldownEnabled",
+    "chartIndicatorsEnabled",
+    "chartIndicators",
+    "requireAllIntervals",
   ]);
-  const arrayKeys = new Set(["allowedLaunchpads", "blockedLaunchpads"]);
+  const arrayKeys = new Set(["allowedLaunchpads", "blockedLaunchpads", "indicatorIntervals"]);
   const stringKeys = new Set([
     "timeframe",
     "category",
@@ -236,6 +259,9 @@ function normalizeConfigValue(key, value) {
     "pnlRpcUrl",
     "gmgnFeeSource",
     "gmgnApiKey",
+    "indicatorEntryPreset",
+    "indicatorExitPreset",
+    "athSource",
   ]);
   if (value === null) return null;
   if (booleanKeys.has(key)) return coerceBoolean(value, key);
@@ -264,6 +290,7 @@ const toolMap = {
   check_smart_wallets_on_pool: checkSmartWalletsOnPool,
   claim_fees: claimFees,
   close_position: closePosition,
+  clean_ghost_positions: cleanGhostPositions,
   get_wallet_balance: getWalletBalances,
   swap_token: swapToken,
   get_top_lpers: studyTopLPers,
@@ -369,6 +396,8 @@ const toolMap = {
       blockedLaunchpads: ["screening", "blockedLaunchpads"],
       minTokenAgeHours: ["screening", "minTokenAgeHours"],
       maxTokenAgeHours: ["screening", "maxTokenAgeHours"],
+      minPctBelowAth: ["screening", "minPctBelowAth"],
+      athSource: ["screening", "athSource"],
       minFeePerTvl24h: ["management", "minFeePerTvl24h"],
       loneCandidateMinDegen: ["screening", "loneCandidateMinDegen"],
       // management
@@ -393,6 +422,11 @@ const toolMap = {
       trailingTriggerPct: ["management", "trailingTriggerPct"],
       trailingDropPct: ["management", "trailingDropPct"],
       pnlSanityMaxDiffPct: ["management", "pnlSanityMaxDiffPct"],
+      slCooldownEnabled: ["management", "slCooldownEnabled"],
+      slCooldownHours: ["management", "slCooldownHours"],
+      lossCooldownEnabled: ["management", "lossCooldownEnabled"],
+      lossCooldownPct: ["management", "lossCooldownPct"],
+      lossCooldownHours: ["management", "lossCooldownHours"],
       // pnl poller
       pnlConfirmTicks: ["pnl", "confirmTicks"],
       // opportunity poller (interval/enabled changes apply on next restart)
@@ -449,6 +483,7 @@ const toolMap = {
       gmgnFeeSource: ["gmgn", "feeSource", ["gmgnFeeSource"]],
       gmgnApiKey: ["gmgn", "apiKey", ["gmgnApiKey"]],
       // chart indicators
+      chartIndicators: ["indicators", "enabled", ["chartIndicators", "enabled"]],
       chartIndicatorsEnabled: ["indicators", "enabled", ["chartIndicators", "enabled"]],
       indicatorEntryPreset: ["indicators", "entryPreset", ["chartIndicators", "entryPreset"]],
       indicatorExitPreset: ["indicators", "exitPreset", ["chartIndicators", "exitPreset"]],

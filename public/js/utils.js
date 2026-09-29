@@ -2,7 +2,6 @@ let csrfToken = "";
     let statusInterval = null;
     let positionsInterval = null;
     let historyInterval = null;
-    let currentChartTimeframe = "7D";
     let dashboardState = {
       status: {},
       positions: [],
@@ -10,7 +9,8 @@ let csrfToken = "";
       candidates: [],
       decisions: [],
       lessons: {},
-      config: {}
+      config: {},
+      pnlCalendar: null
     };
     let closePositionPendingAddr = "";
     let closePositionPendingPair = "";
@@ -86,6 +86,9 @@ let csrfToken = "";
       };
       safeText("view-title", titles[tabId]);
 
+      if (tabId === "dashboard") {
+        if (typeof loadPnlCalendar === "function") loadPnlCalendar();
+      }
       if (tabId === "decisions") {
         loadDecisions();
         loadCandidates();
@@ -124,13 +127,12 @@ let csrfToken = "";
 
     // Polling
     function startPolling() {
-      setChartTimeframe(currentChartTimeframe);
       loadStatus();
       loadPositions();
-      loadPortfolioHistory();
+      loadPnlCalendar();
       statusInterval = setInterval(loadStatus, 10000);
       positionsInterval = setInterval(loadPositions, 10000);
-      historyInterval = setInterval(loadPortfolioHistory, 30000);
+      historyInterval = setInterval(loadPnlCalendar, 30000);
     }
 
     // Build range bar DOM
@@ -166,6 +168,26 @@ let csrfToken = "";
       wrap.appendChild(labels);
       wrap.appendChild(track);
       return wrap;
+    }
+
+    // Calculate total bins count for a position
+    function getPositionTotalBins(p) {
+      if (!p) return null;
+      if (p.total_bins != null) return Number(p.total_bins);
+      const lower = p.lower_bin ?? p.bin_range?.min ?? null;
+      const upper = p.upper_bin ?? p.bin_range?.max ?? null;
+      if (lower != null && upper != null) {
+        return Math.abs(upper - lower) + 1;
+      }
+      if (typeof p.bin_range === "number") {
+        return p.bin_range;
+      }
+      if (p.bin_range && typeof p.bin_range === "object") {
+        if (p.bin_range.bins_below != null || p.bin_range.bins_above != null) {
+          return (Number(p.bin_range.bins_below) || 0) + (Number(p.bin_range.bins_above) || 0) + 1;
+        }
+      }
+      return null;
     }
 
     // ─── Price helpers ───────────────────────────────────────────

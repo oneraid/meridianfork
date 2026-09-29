@@ -155,7 +155,7 @@ Returns the full runtime config.
 ### meridian config set <key> <value>
 Updates a config key. Parses value as JSON when possible.
 \`\`\`
-Valid keys: minTvl, maxTvl, minVolume, maxPositions, deployAmountSol, managementIntervalMin, screeningIntervalMin, managementModel, screeningModel, generalModel, autoSwapAfterClaim, minClaimAmount, outOfRangeWaitMinutes
+Valid keys: minTvl, maxTvl, minVolume, maxPositions, deployAmountSol, managementIntervalMin, screeningIntervalMin, managementModel, screeningModel, generalModel, autoSwapAfterClaim, minClaimAmount, outOfRangeWaitMinutes, minPctBelowAth
 \`\`\`
 
 ### meridian lessons [--limit 50]
@@ -273,6 +273,14 @@ switch (subcommand) {
   case "positions": {
     const { getMyPositions } = await import("./tools/dlmm.js");
     out(await getMyPositions({ force: true }));
+    break;
+  }
+
+  // ── clean-ghosts ─────────────────────────────────────────────────
+  case "clean-ghosts":
+  case "close-ghosts": {
+    const { cleanGhostPositions } = await import("./tools/dlmm.js");
+    out(await cleanGhostPositions({ silent: false }));
     break;
   }
 

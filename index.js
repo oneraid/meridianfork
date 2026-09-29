@@ -5,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { agentLoop } from "./agent.js";
 import { log } from "./logger.js";
-import { getMyPositions, closePosition, getActiveBin } from "./tools/dlmm.js";
+import { getMyPositions, closePosition, getActiveBin, cleanGhostPositions } from "./tools/dlmm.js";
 import { getWalletBalances } from "./tools/wallet.js";
 import { getTopCandidates, degenScore } from "./tools/screening.js";
 import { config, reloadScreeningThresholds, computeDeployAmount } from "./config.js";
@@ -55,6 +55,7 @@ if (isMain) {
   ensureAgentId();
   bootstrapHiveMind().catch((error) => log("hivemind_warn", `Bootstrap failed: ${error.message}`));
   startHiveMindBackgroundSync();
+  cleanGhostPositions({ silent: false }).catch((error) => log("ghost_clean_warn", `Startup ghost cleanup failed: ${error.message}`));
 }
 
 const TP_PCT = config.management.takeProfitPct;
@@ -263,6 +264,8 @@ export async function runManagementCycle({ silent = false } = {}) {
       const cycleTime = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
       liveMessage = await createLiveMessage(`⏱️ Management Cycle · ${cycleTime}`, "Evaluating positions...");
     }
+    // Auto-clean any empty / ghost positions on Meteora to reclaim rent SOL
+    await cleanGhostPositions({ silent: true }).catch((err) => log("ghost_clean_warn", `Management ghost cleanup error: ${err.message}`));
     const livePositions = await getMyPositions({ force: true }).catch(() => null);
     positions = livePositions?.positions || [];
 
@@ -542,19 +545,49 @@ export async function runScreeningCycle({ silent = false } = {}) {
       const launchpad = ti?.launchpad ?? null;
       if (launchpad && config.screening.allowedLaunchpads?.length > 0 && !config.screening.allowedLaunchpads.includes(launchpad)) {
         log("screening", `Skipping ${pool.name} — launchpad ${launchpad} not in allow-list`);
-        filteredOut.push({ name: pool.name, reason: `launchpad ${launchpad} not in allow-list` });
+        filteredOut.push({
+          name: pool.name,
+          pool: pool.pool,
+          base: pool.base,
+          reason: `launchpad ${launchpad} not in allow-list`,
+          tvl: pool.tvl || pool.active_tvl || 0,
+          fee_active_tvl_ratio: pool.fee_active_tvl_ratio || pool.fee_tvl_ratio || 0,
+          volume_window: pool.volume_window || 0,
+          volatility: pool.volatility || null,
+          organic_score: pool.organic_score || null,
+        });
         return false;
       }
       if (launchpad && config.screening.blockedLaunchpads.includes(launchpad)) {
         log("screening", `Skipping ${pool.name} — blocked launchpad (${launchpad})`);
-        filteredOut.push({ name: pool.name, reason: `blocked launchpad (${launchpad})` });
+        filteredOut.push({
+          name: pool.name,
+          pool: pool.pool,
+          base: pool.base,
+          reason: `blocked launchpad (${launchpad})`,
+          tvl: pool.tvl || pool.active_tvl || 0,
+          fee_active_tvl_ratio: pool.fee_active_tvl_ratio || pool.fee_tvl_ratio || 0,
+          volume_window: pool.volume_window || 0,
+          volatility: pool.volatility || null,
+          organic_score: pool.organic_score || null,
+        });
         return false;
       }
       const botPct = ti?.audit?.bot_holders_pct;
       const maxBotHoldersPct = config.screening.maxBotHoldersPct;
       if (botPct != null && maxBotHoldersPct != null && botPct > maxBotHoldersPct) {
         log("screening", `Bot-holder filter: dropped ${pool.name} — bots ${botPct}% > ${maxBotHoldersPct}%`);
-        filteredOut.push({ name: pool.name, reason: `bot holders ${botPct}% > ${maxBotHoldersPct}%` });
+        filteredOut.push({
+          name: pool.name,
+          pool: pool.pool,
+          base: pool.base,
+          reason: `bot holders ${botPct}% > ${maxBotHoldersPct}%`,
+          tvl: pool.tvl || pool.active_tvl || 0,
+          fee_active_tvl_ratio: pool.fee_active_tvl_ratio || pool.fee_tvl_ratio || 0,
+          volume_window: pool.volume_window || 0,
+          volatility: pool.volatility || null,
+          organic_score: pool.organic_score || null,
+        });
         return false;
       }
       return true;

@@ -84,17 +84,32 @@ async function loadPositions() {
           pairName.style.cssText = "font-weight:700;color:var(--text-primary);font-size:14px;";
           pairName.textContent = p.pool_name || p.pair;
 
+          // Meteora DLMM link
           const metLink = document.createElement("a");
           metLink.href = `https://app.meteora.ag/dlmm/${p.pool}`;
           metLink.target = "_blank";
           metLink.rel = "noopener noreferrer";
-          metLink.title = "Open on Meteora";
-          metLink.style.cssText = "color:var(--accent-light);opacity:0.7;display:inline-flex;align-items:center;transition:opacity 0.15s;flex-shrink:0;";
-          metLink.onmouseenter = () => metLink.style.opacity = '1';
-          metLink.onmouseleave = () => metLink.style.opacity = '0.7';
-          metLink.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`;
+          metLink.title = "Open on Meteora DLMM";
+          metLink.style.cssText = "color:var(--accent-light);opacity:0.75;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;padding:2px 5px;border-radius:4px;background:rgba(124,92,255,0.12);border:1px solid rgba(124,92,255,0.25);gap:3px;font-size:10px;font-weight:700;text-decoration:none;";
+          metLink.onmouseenter = () => { metLink.style.opacity = '1'; metLink.style.borderColor = 'var(--accent-light)'; };
+          metLink.onmouseleave = () => { metLink.style.opacity = '0.75'; metLink.style.borderColor = 'rgba(124,92,255,0.25)'; };
+          metLink.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg><span>MET</span>`;
+
+          // GMGN link
+          const gmgnMint = p.base_mint || (p.token_x && typeof p.token_x === "string" ? p.token_x : p.token_x?.address) || p.pool;
+          const gmgnLink = document.createElement("a");
+          gmgnLink.href = `https://gmgn.ai/sol/token/${gmgnMint}`;
+          gmgnLink.target = "_blank";
+          gmgnLink.rel = "noopener noreferrer";
+          gmgnLink.title = "Open on GMGN";
+          gmgnLink.style.cssText = "color:var(--success);opacity:0.75;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;padding:2px 5px;border-radius:4px;background:rgba(16,217,160,0.12);border:1px solid rgba(16,217,160,0.25);gap:3px;font-size:10px;font-weight:700;text-decoration:none;";
+          gmgnLink.onmouseenter = () => { gmgnLink.style.opacity = '1'; gmgnLink.style.borderColor = 'var(--success)'; };
+          gmgnLink.onmouseleave = () => { gmgnLink.style.opacity = '0.75'; gmgnLink.style.borderColor = 'rgba(16,217,160,0.25)'; };
+          gmgnLink.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><span>GMGN</span>`;
+
           divPair.appendChild(pairName);
           divPair.appendChild(metLink);
+          divPair.appendChild(gmgnLink);
 
           const divCA = document.createElement("div");
           divCA.style.cssText = "display:flex;align-items:center;gap:4px;";
@@ -133,7 +148,29 @@ async function loadPositions() {
           tdAmount.textContent = p.amount_sol ? `${Number(p.amount_sol).toFixed(2)} SOL` : "--";
           tr.appendChild(tdAmount);
 
-          // Col 3: Closed PnL
+          // Col 3: Total Bins
+          const tdBins = document.createElement("td");
+          tdBins.style.cssText = "white-space:nowrap;";
+          const totalBins = getPositionTotalBins(p);
+          const binStep = p.bin_step ?? dashboardState.config?.bin_step ?? 100;
+          if (totalBins != null) {
+            const binsVal = document.createElement("div");
+            binsVal.style.cssText = "font-weight:700;font-size:13px;color:var(--accent-light);";
+            binsVal.textContent = `${totalBins} bins`;
+
+            const binsStepEl = document.createElement("div");
+            binsStepEl.style.cssText = "font-size:10px;font-family:'JetBrains Mono';color:var(--text-muted);opacity:0.85;margin-top:1px;";
+            binsStepEl.textContent = `step ${binStep}`;
+
+            tdBins.appendChild(binsVal);
+            tdBins.appendChild(binsStepEl);
+          } else {
+            tdBins.style.cssText = "color:var(--text-muted);";
+            tdBins.textContent = "--";
+          }
+          tr.appendChild(tdBins);
+
+          // Col 4: Closed PnL
           const tdPeak = document.createElement("td");
           tdPeak.style.cssText = "white-space:nowrap;";
           const pnlPct = p.close_pnl_pct ?? 0;
@@ -155,13 +192,13 @@ async function loadPositions() {
           tdPeak.appendChild(pnlUsdEl);
           tr.appendChild(tdPeak);
 
-          // Col 4: Total Fees
+          // Col 5: Total Fees
           const tdFees = document.createElement("td");
           tdFees.style.cssText = "color:var(--text-primary);";
           tdFees.textContent = p.total_fees_claimed_usd ? `$${Number(p.total_fees_claimed_usd).toFixed(2)}` : "$0.00";
           tr.appendChild(tdFees);
 
-          // Col 5: Timeline / Duration
+          // Col 6: Timeline / Duration
           const tdTimeline = document.createElement("td");
           tdTimeline.style.cssText = "font-size:12px;color:var(--text-secondary);line-height:1.4;";
 
@@ -197,7 +234,7 @@ async function loadPositions() {
           tdTimeline.appendChild(closedEl);
           tr.appendChild(tdTimeline);
 
-          // Col 6: Close Reason
+          // Col 7: Close Reason
           const tdReason = document.createElement("td");
           tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
 
@@ -233,8 +270,7 @@ async function loadPositions() {
 
       dashboardState.positions.forEach((p) => {
         const binStep = p.bin_step ?? dashboardState.config?.bin_step ?? 100;
-        const totalBins = (p.lower_bin != null && p.upper_bin != null)
-          ? (p.upper_bin - p.lower_bin + 1) : null;
+        const totalBins = getPositionTotalBins(p);
         const priceLow  = binToSolPrice(p.lower_bin, binStep, p.decimal_multiplier);
         const priceHigh = binToSolPrice(p.upper_bin, binStep, p.decimal_multiplier);
 
@@ -261,14 +297,26 @@ async function loadPositions() {
         metLink.href = `https://app.meteora.ag/dlmm/${p.pool}`;
         metLink.target = "_blank";
         metLink.rel = "noopener noreferrer";
-        metLink.title = "Open on Meteora";
-        metLink.style.cssText = "color:var(--accent-light);opacity:0.7;display:inline-flex;align-items:center;transition:opacity 0.15s;flex-shrink:0;margin-top:1px;";
-        metLink.onmouseenter = () => metLink.style.opacity = '1';
-        metLink.onmouseleave = () => metLink.style.opacity = '0.7';
-        metLink.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`;
+        metLink.title = "Open on Meteora DLMM";
+        metLink.style.cssText = "color:var(--accent-light);opacity:0.75;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;padding:2px 5px;border-radius:4px;background:rgba(124,92,255,0.12);border:1px solid rgba(124,92,255,0.25);gap:3px;font-size:10px;font-weight:700;text-decoration:none;";
+        metLink.onmouseenter = () => { metLink.style.opacity = '1'; metLink.style.borderColor = 'var(--accent-light)'; };
+        metLink.onmouseleave = () => { metLink.style.opacity = '0.75'; metLink.style.borderColor = 'rgba(124,92,255,0.25)'; };
+        metLink.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg><span>MET</span>`;
+        
+        const gmgnMint = p.base_mint || (p.token_x && typeof p.token_x === "string" ? p.token_x : p.token_x?.address) || p.pool;
+        const gmgnLink = document.createElement("a");
+        gmgnLink.href = `https://gmgn.ai/sol/token/${gmgnMint}`;
+        gmgnLink.target = "_blank";
+        gmgnLink.rel = "noopener noreferrer";
+        gmgnLink.title = "Open on GMGN";
+        gmgnLink.style.cssText = "color:var(--success);opacity:0.75;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;padding:2px 5px;border-radius:4px;background:rgba(16,217,160,0.12);border:1px solid rgba(16,217,160,0.25);gap:3px;font-size:10px;font-weight:700;text-decoration:none;";
+        gmgnLink.onmouseenter = () => { gmgnLink.style.opacity = '1'; gmgnLink.style.borderColor = 'var(--success)'; };
+        gmgnLink.onmouseleave = () => { gmgnLink.style.opacity = '0.75'; gmgnLink.style.borderColor = 'rgba(16,217,160,0.25)'; };
+        gmgnLink.innerHTML = `<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><span>GMGN</span>`;
         
         pairDiv.appendChild(pairName);
         pairDiv.appendChild(metLink);
+        pairDiv.appendChild(gmgnLink);
         
         const caDiv = document.createElement("div");
         caDiv.style.cssText = "display:flex;align-items:center;gap:4px;";
