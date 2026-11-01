@@ -2,6 +2,7 @@ let csrfToken = "";
     let statusInterval = null;
     let positionsInterval = null;
     let historyInterval = null;
+    let closedPositionsInterval = null;
     let dashboardState = {
       status: {},
       positions: [],
@@ -103,6 +104,7 @@ let csrfToken = "";
       }
       if (tabId === "positions") {
         if (typeof loadPositions === "function") loadPositions();
+        if (typeof loadPositionsHistory === "function") loadPositionsHistory();
       }
       if (tabId === "smartlp") {
         if (typeof loadSmartLp === "function") loadSmartLp();
@@ -123,6 +125,7 @@ let csrfToken = "";
       clearInterval(statusInterval);
       clearInterval(positionsInterval);
       if (historyInterval) clearInterval(historyInterval);
+      if (closedPositionsInterval) clearInterval(closedPositionsInterval);
       csrfToken = "";
       document.getElementById("app-shell").style.display = "none";
       document.getElementById("login-page").style.display = "flex";
@@ -154,6 +157,9 @@ let csrfToken = "";
       statusInterval = setInterval(loadStatus, 10000);
       positionsInterval = setInterval(loadPositions, 10000);
       historyInterval = setInterval(loadPnlCalendar, 30000);
+      closedPositionsInterval = setInterval(() => {
+        if (typeof loadPositionsHistory === "function") loadPositionsHistory(true);
+      }, 60000);
     }
 
     // Build range bar DOM

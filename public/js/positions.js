@@ -17,7 +17,17 @@ async function loadPositions() {
 
         renderPositionsTable();
         renderDashboardPositionsGrid();
-        loadPositionsHistory();
+
+        // Refresh closed positions history if open positions count changed (e.g. position closed) or if not yet loaded
+        const prevCount = dashboardState._prevOpenPositionsCount;
+        const currentCount = (data.positions || []).length;
+        dashboardState._prevOpenPositionsCount = currentCount;
+
+        if (prevCount !== undefined && currentCount < prevCount) {
+          loadPositionsHistory(true);
+        } else if (!dashboardState.positionsHistory || dashboardState.positionsHistory.length === 0) {
+          loadPositionsHistory();
+        }
       } catch (e) {
         console.error("Failed to load positions", e);
       }
@@ -25,18 +35,34 @@ async function loadPositions() {
 
     // Load closed positions history
     const historyPagination = { page: 0, perPage: 10 };
-    async function loadPositionsHistory() {
+    let _isLoadingHistory = false;
+    let _lastHistoryFetch = 0;
+
+    async function loadPositionsHistory(force = false) {
+      const now = Date.now();
+      // Debounce: don't re-fetch within 15 seconds unless forced
+      if (!force && now - _lastHistoryFetch < 15000 && dashboardState.positionsHistory && dashboardState.positionsHistory.length > 0) {
+        return;
+      }
+      if (_isLoadingHistory) return;
+      _isLoadingHistory = true;
+
       try {
-        const res = await fetch("/api/positions/history");
+        const res = await fetch("/api/positions/history?limit=100");
         if (res.status === 401) return handleLogout();
         const data = await res.json();
         dashboardState.positionsHistory = data.positions || [];
         if (data.sol_price) dashboardState.positionsHistorySolPrice = data.sol_price;
         safeText("positions-history-total-badge", `${data.total_positions} Closed`);
-        historyPagination.page = 0;
+        _lastHistoryFetch = Date.now();
+        if (force || historyPagination.page * historyPagination.perPage >= (data.positions || []).length) {
+          historyPagination.page = 0;
+        }
         renderHistoryPage();
       } catch (e) {
         console.error("Failed to load positions history", e);
+      } finally {
+        _isLoadingHistory = false;
       }
     }
 

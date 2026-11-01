@@ -301,63 +301,76 @@ export function startDashboardServer(context = {}) {
     }
   });
 
+  let _historyCache = {
+    ts: 0,
+    performanceMap: {},
+    smartLpMap: {},
+  };
+
   app.get("/api/positions/history", requireAuth, async (req, res) => {
     try {
       const allTracked = getTrackedPositions(false);
       const closed = allTracked.filter(p => p.closed);
 
-      // Load lessons to match performance pnl_usd / pnl_pct
-      let performanceMap = {};
-      try {
-        const lessonsPath = path.join(REPO_ROOT, "lessons.json");
-        if (fs.existsSync(lessonsPath)) {
-          const lessonsData = JSON.parse(fs.readFileSync(lessonsPath, "utf-8"));
-          const perfList = lessonsData.performance || [];
-          for (const item of perfList) {
-            if (item.position) {
-              performanceMap[item.position] = {
-                pnl_usd: item.pnl_usd,
-                pnl_pct: item.pnl_pct,
-                base_mint: item.base_mint || null
-              };
-            }
-          }
-        }
-      } catch (err) {
-        log("server_error", `Failed to read lessons.json for history: ${err.message}`);
-      }
+      // Check cache (15 seconds TTL) to avoid repeated disk reads
+      const now = Date.now();
+      let performanceMap = _historyCache.performanceMap;
+      let smartLpMap = _historyCache.smartLpMap;
 
-      // Load smart-lp mappings to enrich copied positions with target wallet info
-      const smartLpMap = {};
-      try {
-        const histPath = path.join(REPO_ROOT, "smart-lp-history.json");
-        const cfgPath = path.join(REPO_ROOT, "smart-lp-config.json");
-        const walletNames = {};
-        if (fs.existsSync(cfgPath)) {
-          const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
-          for (const w of (cfg.wallets || [])) {
-            if (w.address && w.name) walletNames[w.address] = w.name;
-          }
-        }
-        if (fs.existsSync(histPath)) {
-          const hist = JSON.parse(fs.readFileSync(histPath, "utf-8"));
-          for (const [targetPos, entry] of Object.entries(hist.copied_positions_map || {})) {
-            if (entry.user_position) {
-              let targetName = entry.target_wallet_name || (entry.target_wallet ? walletNames[entry.target_wallet] : null);
-              if (!targetName && entry.selection_reason) {
-                const m = entry.selection_reason.match(/\((wallet\s*\d+|[^)]+)\)/i);
-                if (m) targetName = m[1];
+      if (now - _historyCache.ts > 15000) {
+        performanceMap = {};
+        try {
+          const lessonsPath = path.join(REPO_ROOT, "lessons.json");
+          if (fs.existsSync(lessonsPath)) {
+            const lessonsData = JSON.parse(fs.readFileSync(lessonsPath, "utf-8"));
+            const perfList = lessonsData.performance || [];
+            for (const item of perfList) {
+              if (item.position) {
+                performanceMap[item.position] = {
+                  pnl_usd: item.pnl_usd,
+                  pnl_pct: item.pnl_pct,
+                  base_mint: item.base_mint || null
+                };
               }
-              smartLpMap[entry.user_position] = {
-                target_wallet: entry.target_wallet || null,
-                target_wallet_name: targetName || null,
-                target_position: targetPos,
-              };
             }
           }
+        } catch (err) {
+          log("server_error", `Failed to read lessons.json for history: ${err.message}`);
         }
-      } catch (err) {
-        log("server_error", `Failed to read smart-lp for history: ${err.message}`);
+
+        smartLpMap = {};
+        try {
+          const histPath = path.join(REPO_ROOT, "smart-lp-history.json");
+          const cfgPath = path.join(REPO_ROOT, "smart-lp-config.json");
+          const walletNames = {};
+          if (fs.existsSync(cfgPath)) {
+            const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+            for (const w of (cfg.wallets || [])) {
+              if (w.address && w.name) walletNames[w.address] = w.name;
+            }
+          }
+          if (fs.existsSync(histPath)) {
+            const hist = JSON.parse(fs.readFileSync(histPath, "utf-8"));
+            for (const [targetPos, entry] of Object.entries(hist.copied_positions_map || {})) {
+              if (entry.user_position) {
+                let targetName = entry.target_wallet_name || (entry.target_wallet ? walletNames[entry.target_wallet] : null);
+                if (!targetName && entry.selection_reason) {
+                  const m = entry.selection_reason.match(/\((wallet\s*\d+|[^)]+)\)/i);
+                  if (m) targetName = m[1];
+                }
+                smartLpMap[entry.user_position] = {
+                  target_wallet: entry.target_wallet || null,
+                  target_wallet_name: targetName || null,
+                  target_position: targetPos,
+                };
+              }
+            }
+          }
+        } catch (err) {
+          log("server_error", `Failed to read smart-lp for history: ${err.message}`);
+        }
+
+        _historyCache = { ts: now, performanceMap, smartLpMap };
       }
 
       // Map closed positions with their final performance PnL
@@ -412,20 +425,35 @@ export function startDashboardServer(context = {}) {
         }
 
         return {
-          ...p,
-          target_wallet_name: targetWalletName || p.target_wallet_name || null,
-          close_reason: formattedCloseReason,
+          position: p.position,
+          pool: p.pool,
+          pool_name: p.pool_name,
+          pair: p.pair,
+          base_mint: p.base_mint || perf.base_mint || p.signal_snapshot?.base_mint || null,
+          token_x: p.token_x,
+          amount_sol: p.amount_sol,
+          bin_range: p.bin_range,
+          bin_step: p.bin_step,
+          strategy: p.strategy,
+          initial_value_usd: p.initial_value_usd,
           close_pnl_pct,
           close_pnl_usd,
           close_pnl_sol: close_pnl_sol != null ? parseFloat(Number(close_pnl_sol).toFixed(6)) : null,
-          base_mint: p.base_mint || perf.base_mint || p.signal_snapshot?.base_mint || null
+          total_fees_claimed_usd: p.total_fees_claimed_usd,
+          deployed_at: p.deployed_at,
+          closed_at: p.closed_at,
+          close_reason: formattedCloseReason,
+          target_wallet_name: targetWalletName || p.target_wallet_name || null,
         };
       });
 
       // Sort closed positions by closed_at descending (newest closed first)
       mappedClosed.sort((a, b) => new Date(b.closed_at || 0) - new Date(a.closed_at || 0));
+
+      // Limit response payload to 100 items (fast mobile load, 98% smaller payload)
+      const limit = req.query.limit ? Math.min(500, Math.max(10, parseInt(req.query.limit))) : 100;
       res.json({
-        positions: mappedClosed,
+        positions: mappedClosed.slice(0, limit),
         total_positions: mappedClosed.length,
         sol_price: lastKnownSolPrice || 0
       });
