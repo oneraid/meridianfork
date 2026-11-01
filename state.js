@@ -73,12 +73,16 @@ export function trackPosition({
   entry_tvl = null,
   entry_volume = null,
   entry_holders = null,
+  target_wallet_name = null,
+  target_wallet = null,
 }) {
   const state = load();
   state.positions[position] = {
     position,
     pool,
     pool_name,
+    target_wallet_name: target_wallet_name || null,
+    target_wallet: target_wallet || null,
     strategy,
     bin_range,
     amount_sol,

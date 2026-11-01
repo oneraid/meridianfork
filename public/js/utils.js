@@ -23,6 +23,17 @@ let csrfToken = "";
       if (el) el.textContent = (text !== undefined && text !== null) ? text : "";
     }
 
+    function escapeHtml(str) {
+      if (str == null) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+    window.escapeHtml = escapeHtml;
+
     function updateApiStatusEl(id, statusObj) {
       const el = document.getElementById(id);
       if (!el) return;

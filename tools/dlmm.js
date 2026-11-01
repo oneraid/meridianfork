@@ -885,6 +885,7 @@ export async function deployPosition({
       entry_tvl,
       entry_volume,
       entry_holders,
+      target_wallet_name: target_wallet_name || null,
     });
 
     appendDecision({

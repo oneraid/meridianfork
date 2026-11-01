@@ -258,10 +258,10 @@ async function loadPositions() {
 
           // Col 7: Close Reason
           const tdReason = document.createElement("td");
-          tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+          tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
 
-          let reasonStr = "--";
-          if (p.notes && p.notes.length > 0) {
+          let reasonStr = p.close_reason || "--";
+          if (reasonStr === "--" && p.notes && p.notes.length > 0) {
             const lastNote = p.notes[p.notes.length - 1];
             if (lastNote.includes("Closed at")) {
               reasonStr = lastNote.split("Closed at")[1].replace(/^[^:]*:\s*/, "");
@@ -269,8 +269,32 @@ async function loadPositions() {
               reasonStr = lastNote;
             }
           }
-          tdReason.textContent = reasonStr;
-          tdReason.title = reasonStr;
+
+          const targetName = p.target_wallet_name || p.target_name || null;
+          if (targetName && !reasonStr.toLowerCase().startsWith(targetName.toLowerCase())) {
+            const wLabel = targetName.charAt(0).toUpperCase() + targetName.slice(1);
+            let clean = reasonStr;
+            if (/^Smart LP:\s*Target\s+.*closed\s+position/i.test(clean)) {
+              clean = "Target closed position";
+            } else if (/^Smart LP:\s*Target exited previously/i.test(clean)) {
+              clean = "Target exited (recovery close)";
+            } else {
+              clean = clean.replace(/^Smart LP:\s*/i, "").trim();
+            }
+            clean = clean.replace(/^(?:wallet\s*\d+|target\s*wallet)\s*:\s*/i, "").trim();
+            if (!clean) clean = "Target closed position";
+            reasonStr = `${wLabel} : ${clean}`;
+          }
+
+          const matchColon = reasonStr.match(/^((?:Wallet|wallet)\s*\d+|Target\s+Wallet)\s*:\s*(.+)$/i);
+          if (matchColon) {
+            const wPart = matchColon[1].charAt(0).toUpperCase() + matchColon[1].slice(1);
+            tdReason.innerHTML = `<span style="color:var(--accent-light);font-weight:700;">${escapeHtml(wPart)} :</span> <span style="color:var(--text-secondary);">${escapeHtml(matchColon[2])}</span>`;
+            tdReason.title = reasonStr;
+          } else {
+            tdReason.textContent = reasonStr;
+            tdReason.title = reasonStr;
+          }
           tr.appendChild(tdReason);
 
           // Col 8: Share Recap Card

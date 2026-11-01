@@ -327,6 +327,39 @@ export function startDashboardServer(context = {}) {
         log("server_error", `Failed to read lessons.json for history: ${err.message}`);
       }
 
+      // Load smart-lp mappings to enrich copied positions with target wallet info
+      const smartLpMap = {};
+      try {
+        const histPath = path.join(REPO_ROOT, "smart-lp-history.json");
+        const cfgPath = path.join(REPO_ROOT, "smart-lp-config.json");
+        const walletNames = {};
+        if (fs.existsSync(cfgPath)) {
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+          for (const w of (cfg.wallets || [])) {
+            if (w.address && w.name) walletNames[w.address] = w.name;
+          }
+        }
+        if (fs.existsSync(histPath)) {
+          const hist = JSON.parse(fs.readFileSync(histPath, "utf-8"));
+          for (const [targetPos, entry] of Object.entries(hist.copied_positions_map || {})) {
+            if (entry.user_position) {
+              let targetName = entry.target_wallet_name || (entry.target_wallet ? walletNames[entry.target_wallet] : null);
+              if (!targetName && entry.selection_reason) {
+                const m = entry.selection_reason.match(/\((wallet\s*\d+|[^)]+)\)/i);
+                if (m) targetName = m[1];
+              }
+              smartLpMap[entry.user_position] = {
+                target_wallet: entry.target_wallet || null,
+                target_wallet_name: targetName || null,
+                target_position: targetPos,
+              };
+            }
+          }
+        }
+      } catch (err) {
+        log("server_error", `Failed to read smart-lp for history: ${err.message}`);
+      }
+
       // Map closed positions with their final performance PnL
       const mappedClosed = closed.map(p => {
         const perf = performanceMap[p.position] || {};
@@ -343,8 +376,45 @@ export function startDashboardServer(context = {}) {
           }
         }
 
+        const copyInfo = smartLpMap[p.position] || null;
+        let targetWalletName = p.target_wallet_name || copyInfo?.target_wallet_name || null;
+        if (!targetWalletName) {
+          const combined = `${p.close_reason || ""} ${p.notes?.join(" ") || ""}`;
+          const m = combined.match(/(?:Wallet|wallet)\s*\d+/);
+          if (m) targetWalletName = m[0];
+        }
+
+        let rawReason = p.close_reason || "";
+        if (!rawReason && p.notes && p.notes.length > 0) {
+          const lastNote = p.notes[p.notes.length - 1];
+          if (lastNote.includes("Closed at")) {
+            rawReason = lastNote.split("Closed at")[1].replace(/^[^:]*:\s*/, "");
+          } else {
+            rawReason = lastNote;
+          }
+        }
+        if (!rawReason) rawReason = "Closed";
+
+        let formattedCloseReason = rawReason;
+        if (targetWalletName) {
+          const wLabel = targetWalletName.charAt(0).toUpperCase() + targetWalletName.slice(1);
+          let clean = rawReason;
+          if (/^Smart LP:\s*Target\s+.*closed\s+position/i.test(clean)) {
+            clean = "Target closed position";
+          } else if (/^Smart LP:\s*Target exited previously/i.test(clean)) {
+            clean = "Target exited (recovery close)";
+          } else {
+            clean = clean.replace(/^Smart LP:\s*/i, "").trim();
+          }
+          clean = clean.replace(/^(?:wallet\s*\d+|target\s*wallet)\s*:\s*/i, "").trim();
+          if (!clean) clean = "Target closed position";
+          formattedCloseReason = `${wLabel} : ${clean}`;
+        }
+
         return {
           ...p,
+          target_wallet_name: targetWalletName || p.target_wallet_name || null,
+          close_reason: formattedCloseReason,
           close_pnl_pct,
           close_pnl_usd,
           close_pnl_sol: close_pnl_sol != null ? parseFloat(Number(close_pnl_sol).toFixed(6)) : null,

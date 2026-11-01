@@ -903,12 +903,15 @@ export async function checkAndExecuteCopyPnlExits(history, config, providedPosit
 
     if (!isStopLoss && !isTakeProfit) continue;
 
+    const targetWalletObj = config.wallets?.find((w) => w.address === copyInfo.target_wallet);
+    const targetWalletName = targetWalletObj?.name || copyInfo.target_wallet_name || "Target Wallet";
+    const wLabel = targetWalletName.charAt(0).toUpperCase() + targetWalletName.slice(1);
     const exitType = isStopLoss ? "STOP_LOSS" : "TAKE_PROFIT";
     const exitReason = isStopLoss
-      ? `Smart LP: Auto Stop Loss triggered (${currentPnlPct.toFixed(2)}% <= -${slPct}%)`
-      : `Smart LP: Auto Take Profit triggered (+${currentPnlPct.toFixed(2)}% >= +${tpPct}%)`;
+      ? `${wLabel} : Auto Stop Loss triggered (${currentPnlPct.toFixed(2)}% <= -${slPct}%)`
+      : `${wLabel} : Auto Take Profit triggered (+${currentPnlPct.toFixed(2)}% >= +${tpPct}%)`;
 
-    log("smart_lp", `🚨 [${exitType}] Triggered on copy position ${userPos.slice(0, 8)}: PnL ${currentPnlPct.toFixed(2)}% (SL: -${slPct}%, TP: +${tpPct}%) — closing immediately without waiting for target wallet to exit!`);
+    log("smart_lp", `🚨 [${exitType}] Triggered on copy position ${userPos.slice(0, 8)} (${wLabel}): PnL ${currentPnlPct.toFixed(2)}% (SL: -${slPct}%, TP: +${tpPct}%) — closing immediately without waiting for target wallet to exit!`);
 
     _closingPositions.add(userPos);
     let closeSuccess = false;
@@ -1925,10 +1928,11 @@ export async function pollTargetWallet(triggerSource = "cron") {
 
               for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
-                  log("smart_lp", `Target exited — closing mirrored user position ${mappedCopy.user_position} (attempt ${attempt}/3)`);
+                  const wLabel = target.name.charAt(0).toUpperCase() + target.name.slice(1);
+                  log("smart_lp", `Target exited — closing mirrored user position ${mappedCopy.user_position} (${wLabel}, attempt ${attempt}/3)`);
                   const closeRes = await closePosition({
                     position_address: mappedCopy.user_position,
-                    reason: `Smart LP: Target ${target.name} closed position`,
+                    reason: `${wLabel} : Target closed position`,
                   });
                   if (closeRes?.success) {
                     closeSuccess = true;
@@ -2004,9 +2008,12 @@ export async function pollTargetWallet(triggerSource = "cron") {
           log("smart_lp_warn", `Target already exited for copy ${copyInfo.user_position} — auto-recovery close retry...`);
           for (let attempt = 1; attempt <= 3; attempt++) {
             try {
+              const targetWalletObj = config.wallets?.find((w) => w.address === copyInfo.target_wallet);
+              const targetWalletName = targetWalletObj?.name || copyInfo.target_wallet_name || "Target Wallet";
+              const wLabel = targetWalletName.charAt(0).toUpperCase() + targetWalletName.slice(1);
               const closeRes = await closePosition({
                 position_address: copyInfo.user_position,
-                reason: "Smart LP: Target exited previously (auto-recovery close)",
+                reason: `${wLabel} : Target exited previously (auto-recovery close)`,
               });
               if (closeRes?.success) {
                 copyInfo.status = "closed";
@@ -2225,6 +2232,7 @@ export async function pollTargetWallet(triggerSource = "cron") {
                     user_sol: config.copy_settings.max_sol_per_position,
                     status: "open",
                     target_wallet: target.address,
+                    target_wallet_name: target.name,
                     copy_priority: target.copy_priority ?? 99,
                     copy_strategy: strategy,
                     selection_reason: chosenReason,
