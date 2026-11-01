@@ -298,8 +298,6 @@ async function loadPositions() {
             tdReason.innerHTML = `<div style="color:var(--text-secondary);line-height:1.4;font-size:12px;white-space:normal;word-break:break-word;">${escapeHtml(reasonStr)}</div>`;
             tdReason.title = reasonStr;
           }
-            tdReason.title = reasonStr;
-          }
           tr.appendChild(tdReason);
 
           // Col 8: Share Recap Card

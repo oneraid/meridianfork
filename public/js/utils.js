@@ -101,6 +101,9 @@ let csrfToken = "";
       if (tabId === "dashboard") {
         if (typeof loadPnlCalendar === "function") loadPnlCalendar();
       }
+      if (tabId === "positions") {
+        if (typeof loadPositions === "function") loadPositions();
+      }
       if (tabId === "smartlp") {
         if (typeof loadSmartLp === "function") loadSmartLp();
       }
