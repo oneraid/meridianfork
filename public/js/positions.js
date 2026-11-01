@@ -31,6 +31,7 @@ async function loadPositions() {
         if (res.status === 401) return handleLogout();
         const data = await res.json();
         dashboardState.positionsHistory = data.positions || [];
+        if (data.sol_price) dashboardState.positionsHistorySolPrice = data.sol_price;
         safeText("positions-history-total-badge", `${data.total_positions} Closed`);
         historyPagination.page = 0;
         renderHistoryPage();
@@ -64,7 +65,7 @@ async function loadPositions() {
 
       if (total === 0) {
         const tr = document.createElement("tr");
-        const td = document.createElement("td"); td.colSpan = 7;
+        const td = document.createElement("td"); td.colSpan = 8;
         td.style.cssText = "text-align:center;padding:24px;color:var(--text-muted);font-size:13px;";
         td.textContent = "No closed positions found in history.";
         tr.appendChild(td); container.appendChild(tr);
@@ -188,8 +189,29 @@ async function loadPositions() {
           const usdSign = pnlUsd > 0 ? '+' : '';
           pnlUsdEl.textContent = `${usdSign}$${Number(pnlUsd).toFixed(3)}`;
 
+          // SOL version
+          let pnlSol = p.close_pnl_sol;
+          if (pnlSol == null || isNaN(pnlSol)) {
+            const solPrice = (p.initial_value_usd > 0 && p.amount_sol > 0)
+              ? (p.initial_value_usd / p.amount_sol)
+              : (Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || Number(dashboardState.positionsHistorySolPrice) || 150);
+            pnlSol = solPrice > 0 ? (pnlUsd / solPrice) : (p.amount_sol ? p.amount_sol * (pnlPct / 100) : 0);
+          }
+
+          const pnlSolEl = document.createElement("div");
+          pnlSolEl.style.cssText = `font-size:10px;font-family:'JetBrains Mono';font-weight:600;color:${pnlColor};opacity:0.9;margin-top:1px;`;
+          const solSign = pnlSol > 0 ? '+' : pnlSol < 0 ? '-' : '';
+          const absSol = Math.abs(pnlSol);
+          let solStr = '0.000';
+          if (absSol >= 1) solStr = absSol.toFixed(3);
+          else if (absSol >= 0.01) solStr = absSol.toFixed(4);
+          else if (absSol >= 0.0001) solStr = absSol.toFixed(5);
+          else if (absSol > 0) solStr = absSol.toFixed(6);
+          pnlSolEl.textContent = `${solSign}${solStr} SOL`;
+
           tdPeak.appendChild(pnlPctEl);
           tdPeak.appendChild(pnlUsdEl);
+          tdPeak.appendChild(pnlSolEl);
           tr.appendChild(tdPeak);
 
           // Col 5: Total Fees
@@ -251,8 +273,81 @@ async function loadPositions() {
           tdReason.title = reasonStr;
           tr.appendChild(tdReason);
 
+          // Col 8: Share Recap Card
+          const tdShare = document.createElement("td");
+          tdShare.style.cssText = "text-align:center;white-space:nowrap;";
+          const shareBtn = document.createElement("button");
+          shareBtn.className = "btn-ghost btn-xs";
+          shareBtn.title = "Share Position Recap Card";
+          shareBtn.style.cssText = "display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:4px 8px;border-radius:6px;background:rgba(124,92,255,0.12);color:var(--accent-light);border:1px solid rgba(124,92,255,0.25);cursor:pointer;font-size:11px;font-weight:700;";
+          shareBtn.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg><span>Share</span>`;
+          shareBtn.onclick = () => openShareCardModal(p);
+          tdShare.appendChild(shareBtn);
+          tr.appendChild(tdShare);
+
           container.appendChild(tr);
         });
+    }
+
+    function openShareCardModal(p) {
+      const modal = document.getElementById("share-card-modal");
+      if (!modal) return;
+      const loading = document.getElementById("share-card-loading");
+      const container = document.getElementById("share-card-container");
+      const img = document.getElementById("share-card-img");
+      const copied = document.getElementById("share-card-copied");
+      const btnDownload = document.getElementById("btn-download-card");
+      const btnCopy = document.getElementById("btn-copy-card");
+
+      if (copied) copied.style.display = "none";
+      if (loading) {
+        loading.style.display = "block";
+        loading.innerHTML = '<div style="font-size:24px;margin-bottom:8px;">⏳</div>Generating high-res recap card...';
+        loading.style.color = "var(--text-muted)";
+      }
+      if (container) container.style.display = "none";
+
+      const cardUrl = `/api/positions/card/${encodeURIComponent(p.position || "")}`;
+      img.onload = () => {
+        if (loading) loading.style.display = "none";
+        if (container) container.style.display = "block";
+      };
+      img.onerror = () => {
+        if (loading) {
+          loading.textContent = "Failed to load card. Check server logs.";
+          loading.style.color = "var(--danger)";
+        }
+      };
+      img.src = cardUrl;
+
+      // Download handler
+      btnDownload.onclick = () => {
+        const a = document.createElement("a");
+        a.href = cardUrl;
+        a.download = `Recap-${(p.pool_name || p.pair || "Position").replace(/[^a-zA-Z0-9_-]/g, "_")}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      // Copy to clipboard handler
+      btnCopy.onclick = async () => {
+        try {
+          const res = await fetch(cardUrl);
+          const blob = await res.blob();
+          await navigator.clipboard.write([
+            new ClipboardItem({ [blob.type]: blob })
+          ]);
+          if (copied) {
+            copied.style.display = "inline";
+            setTimeout(() => { copied.style.display = "none"; }, 2500);
+          }
+        } catch (err) {
+          alert("Could not copy image to clipboard: " + err.message);
+        }
+      };
+
+      modal.showModal();
     }
 
     function renderPositionsTable() {

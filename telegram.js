@@ -164,6 +164,32 @@ export async function sendHTML(html) {
   return postTelegram("sendMessage", { text: html.slice(0, 4096), parse_mode: "HTML" });
 }
 
+export async function sendPhoto(photoBuffer, caption = "") {
+  if (!TOKEN || !chatId || !photoBuffer) return null;
+  try {
+    const formData = new FormData();
+    formData.append("chat_id", String(chatId));
+    formData.append("photo", new Blob([photoBuffer], { type: "image/png" }), "recap-card.png");
+    if (caption) {
+      formData.append("caption", String(caption).slice(0, 1024));
+      formData.append("parse_mode", "HTML");
+    }
+    const res = await fetch(`${BASE}/sendPhoto`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      log("telegram_error", `sendPhoto ${res.status}: ${err.slice(0, 200)}`);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    log("telegram_error", `sendPhoto failed: ${e.message}`);
+    return null;
+  }
+}
+
 export async function editMessage(text, messageId) {
   if (!TOKEN || !chatId || !messageId) return null;
   return postTelegram("editMessageText", {

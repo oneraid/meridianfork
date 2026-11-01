@@ -10,9 +10,15 @@ import {
   cleanGhostPositions,
   searchPools,
 } from "./dlmm.js";
-import { getWalletBalances, swapToken } from "./wallet.js";
+import {
+  getWalletBalances,
+  swapToken,
+  getOnChainTokenBalance,
+  getNonSolTokensWithBalance,
+  normalizeMint,
+} from "./wallet.js";
 import { studyTopLPers } from "./study.js";
-import { addLesson, clearAllLessons, clearPerformance, removeLessonsByKeyword, getPerformanceHistory, pinLesson, unpinLesson, listLessons } from "../lessons.js";
+import { addLesson, clearAllLessons, clearBadLessons, clearPerformance, removeLessonsByKeyword, getPerformanceHistory, pinLesson, unpinLesson, listLessons } from "../lessons.js";
 import { setPositionInstruction } from "../state.js";
 
 import { getPoolMemory, addPoolNote } from "../pool-memory.js";
@@ -169,11 +175,27 @@ async function validateDeployPoolThresholds(args) {
   const minPctBelowAth = numberOrNull(config.screening.minPctBelowAth);
   if (minPctBelowAth != null && minPctBelowAth > 0) {
     const { checkAthFilter } = await import("./screening.js");
-    const athCheck = await checkAthFilter(baseMint, detail, minPctBelowAth);
+    const athSource = config.screening?.athSource || "meteora";
+    const athTimeframe = config.screening?.athTimeframe || "1h";
+    const athCheck = await checkAthFilter(baseMint, detail, minPctBelowAth, athSource, athTimeframe);
     if (!athCheck.pass) {
       return {
         pass: false,
         reason: athCheck.reason || `Price is only ${athCheck.pctBelowAth?.toFixed(1)}% below ATH (required minPctBelowAth: ${minPctBelowAth}%, source: ${athCheck.source}).`,
+      };
+    }
+  }
+
+  if (config.indicators?.enabled && baseMint) {
+    const { confirmIndicatorPreset } = await import("./chart-indicators.js");
+    const indicatorCheck = await confirmIndicatorPreset({
+      mint: baseMint,
+      side: "entry",
+    });
+    if (indicatorCheck?.enabled && !indicatorCheck.confirmed && !indicatorCheck.skipped) {
+      return {
+        pass: false,
+        reason: `Technical indicator entry condition not met: ${indicatorCheck.reason}`,
       };
     }
   }
@@ -293,6 +315,8 @@ const toolMap = {
   clean_ghost_positions: cleanGhostPositions,
   get_wallet_balance: getWalletBalances,
   swap_token: swapToken,
+  zap_out_tokens: zapOutTokensToSol,
+  sweep_tokens_to_sol: (args) => zapOutTokensToSol({ sweepWallet: true, label: "manual sweep", ...(args || {}) }),
   get_top_lpers: studyTopLPers,
   study_top_lpers: studyTopLPers,
   set_position_note: ({ position_address, instruction }) => {
@@ -353,6 +377,11 @@ const toolMap = {
       const n = clearAllLessons();
       log("lessons", `Cleared all ${n} lessons`);
       return { cleared: n, mode: "all" };
+    }
+    if (mode === "bad" || mode === "negative") {
+      const n = clearBadLessons();
+      log("lessons", `Pruned ${n} bad/negative lessons`);
+      return { cleared: n, mode: "bad" };
     }
     if (mode === "performance") {
       const n = clearPerformance();
@@ -633,37 +662,139 @@ const PROTECTED_TOOLS = new Set([
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Swap a base token back to SOL with retry. Jupiter can transiently fail (no route,
- * quote error) and a single attempt silently leaves the token unsold — this retries
- * with a delay, re-fetching the balance each attempt (amounts can shift on partial
- * fills). Treats both a throw AND result.success===false / missing tx as failure.
- * Returns { swapped, result, token } — swapped=false if nothing to do or all attempts failed.
+ * Zap out tokens back to SOL using direct on-chain RPC balance lookups,
+ * progressive slippage, and optional wallet sweeping.
  */
-async function swapBaseToSolWithRetry(baseMint, label) {
-  const attempts = Math.max(1, Number(config.management.autoSwapRetryAttempts ?? 3));
+export async function zapOutTokensToSol({
+  mints = [],
+  sweepWallet = false,
+  label = "after close",
+  maxRetries = null,
+} = {}) {
+  const attempts = maxRetries ?? Math.max(1, Number(config.management.autoSwapRetryAttempts ?? 3));
   const delayMs = Math.max(0, Number(config.management.autoSwapRetryDelayMs ?? 3000));
-  let lastErr = null;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const balances = await getWalletBalances({});
-      const token = balances.tokens?.find((t) => t.mint === baseMint);
-      if (!token || token.usd < 0.10) {
-        // Nothing left to swap (already sold or dust) — treat as done.
-        return { swapped: attempt > 1, result: null, token: null };
-      }
-      log("executor", `Auto-swapping ${label} ${token.symbol || baseMint.slice(0, 8)} ($${token.usd.toFixed(2)}) back to SOL (attempt ${attempt}/${attempts})`);
-      const swapResult = await swapToken({ input_mint: baseMint, output_mint: "SOL", amount: token.balance });
-      const ok = swapResult && swapResult.success !== false && !swapResult.error && (swapResult.tx || swapResult.amount_out);
-      if (ok) return { swapped: true, result: swapResult, token };
-      lastErr = swapResult?.error || swapResult?.reason || "swap returned no tx";
-    } catch (e) {
-      lastErr = e.message;
+  const solMint = config.tokens.SOL || "So11111111111111111111111111111111111111112";
+
+  const targetMints = new Set();
+  const inputList = Array.isArray(mints) ? mints : [mints];
+  for (const m of inputList) {
+    if (!m) continue;
+    const norm = normalizeMint(m);
+    if (norm && norm !== solMint && norm !== "SOL") {
+      targetMints.add(norm);
     }
-    log("executor_warn", `Auto-swap ${label} attempt ${attempt}/${attempts} failed: ${lastErr}`);
-    if (attempt < attempts) await sleep(delayMs);
   }
-  log("executor_warn", `Auto-swap ${label} failed after ${attempts} attempts — base token left unsold (${baseMint.slice(0, 8)})`);
-  return { swapped: false, result: null, token: null };
+
+  // If sweepWallet is enabled, also scan on-chain token accounts for any other non-SOL balances
+  if (sweepWallet) {
+    try {
+      const nonSolTokens = await getNonSolTokensWithBalance();
+      for (const t of nonSolTokens) {
+        if (t.mint && t.mint !== solMint && t.mint !== "SOL") {
+          targetMints.add(t.mint);
+        }
+      }
+    } catch (e) {
+      log("executor_warn", `Failed to scan wallet token balances for sweep: ${e.message}`);
+    }
+  }
+
+  if (targetMints.size === 0) {
+    return { swapped: false, swaps: [], total_sol_received: 0 };
+  }
+
+  const swaps = [];
+  let totalSolReceived = 0;
+
+  for (const mint of targetMints) {
+    let swappedForMint = false;
+    let lastErr = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const onChain = await getOnChainTokenBalance(mint);
+        if (!onChain || !onChain.raw_amount || onChain.raw_amount === "0" || onChain.balance <= 0) {
+          // If on first attempt and multiple attempts allowed, give RPC a short moment to reflect withdrawal
+          if (attempt === 1 && attempts > 1) {
+            await sleep(delayMs);
+            continue;
+          }
+          // Zero balance on-chain; nothing to swap
+          break;
+        }
+
+        // Check if USD value is known to avoid spending excessive gas on sub-cent dust (< $0.10)
+        let tokenUsd = null;
+        try {
+          const balances = await getWalletBalances({});
+          const found = balances.tokens?.find((t) => t.mint === mint);
+          if (found?.usd != null) tokenUsd = found.usd;
+        } catch { /* ignore balance metadata failure */ }
+
+        if (tokenUsd != null && Number.isFinite(tokenUsd) && tokenUsd < 0.10) {
+          log("executor", `Skipping zap-out for ${mint.slice(0, 8)}: dust balance ($${tokenUsd.toFixed(2)})`);
+          break;
+        }
+
+        const slippageBps = attempt === 1 ? 250 : attempt === 2 ? 450 : 700;
+        const valStr = tokenUsd != null ? `$${tokenUsd.toFixed(2)}` : `${onChain.balance} tokens`;
+        log("executor", `Zap-out (${label}) ${mint.slice(0, 8)} (${valStr}) → SOL [slippage: ${slippageBps} bps, attempt ${attempt}/${attempts}]`);
+
+        const swapResult = await swapToken({
+          input_mint: mint,
+          output_mint: "SOL",
+          amount: onChain.balance,
+          raw_amount: onChain.raw_amount,
+          slippage_bps: slippageBps,
+        });
+
+        const ok = swapResult && swapResult.success !== false && !swapResult.error && (swapResult.tx || swapResult.amount_out);
+        if (ok) {
+          swappedForMint = true;
+          const solReceived = swapResult.amount_out ? Number(swapResult.amount_out) / 1e9 : 0;
+          totalSolReceived += solReceived;
+          swaps.push({
+            mint,
+            tx: swapResult.tx,
+            amount_in: onChain.balance,
+            sol_received: solReceived,
+            usd: tokenUsd,
+          });
+          log("executor", `Zap-out (${label}) SUCCESS: ${mint.slice(0, 8)} → SOL (${swapResult.tx || "confirmed"})`);
+          break;
+        }
+        if (swapResult?.dry_run) {
+          swappedForMint = true;
+          log("executor", `Zap-out (${label}) DRY RUN: would swap ${mint.slice(0, 8)} (${valStr}) → SOL`);
+          break;
+        }
+        lastErr = swapResult?.error || swapResult?.reason || "swap returned no tx";
+      } catch (e) {
+        lastErr = e.message;
+      }
+      log("executor_warn", `Zap-out (${label}) ${mint.slice(0, 8)} attempt ${attempt}/${attempts} failed: ${lastErr}`);
+      if (attempt < attempts) await sleep(delayMs);
+    }
+
+    if (!swappedForMint && lastErr) {
+      log("executor_warn", `Zap-out (${label}) left token unsold (${mint.slice(0, 8)}): ${lastErr}`);
+    }
+  }
+
+  return {
+    swapped: swaps.length > 0,
+    swaps,
+    total_sol_received: totalSolReceived,
+  };
+}
+
+export async function swapBaseToSolWithRetry(baseMint, label = "after close") {
+  const res = await zapOutTokensToSol({ mints: [baseMint], sweepWallet: false, label });
+  return {
+    swapped: res.swapped,
+    result: res.swaps[0] || null,
+    token: null,
+  };
 }
 
 /**
@@ -731,18 +862,70 @@ export async function executeTool(name, args) {
           const poolAddr = result.pool || args.pool_address;
           if (poolAddr) addPoolNote({ pool_address: poolAddr, note: `Closed: low yield (fee/TVL below threshold) at ${new Date().toISOString().slice(0,10)}` }).catch?.(() => {});
         }
-        // Auto-swap base token back to SOL unless user said to hold (retried).
-        if (!args.skip_swap && result.base_mint) {
-          const { swapped, result: swapResult } = await swapBaseToSolWithRetry(result.base_mint, "after close");
-          if (swapped) {
-            // Tell the model the swap already happened so it doesn't call swap_token again
+        // Auto-swap all position base tokens and leftover tokens back to SOL unless user said to hold (skip_swap).
+        if (!args.skip_swap) {
+          const candidateMints = new Set();
+          if (Array.isArray(result.tokens_to_swap)) {
+            result.tokens_to_swap.forEach((m) => candidateMints.add(m));
+          }
+          if (result.base_mint) candidateMints.add(result.base_mint);
+          if (result.token_x_mint) candidateMints.add(result.token_x_mint);
+          if (result.token_y_mint) candidateMints.add(result.token_y_mint);
+
+          const zapResult = await zapOutTokensToSol({
+            mints: Array.from(candidateMints),
+            sweepWallet: true,
+            label: "after close",
+          });
+
+          if (zapResult.swapped) {
             result.auto_swapped = true;
-            result.auto_swap_note = `Base token already auto-swapped back to SOL (${result.base_mint.slice(0, 8)} → SOL). Do NOT call swap_token again.`;
-            if (swapResult?.amount_out) result.sol_received = swapResult.amount_out;
+            result.swapped_tokens = zapResult.swaps;
+            result.sol_received = zapResult.total_sol_received;
+            const tokenList = zapResult.swaps.map((s) => s.mint.slice(0, 8)).join(", ");
+            result.auto_swap_note = `Zap-out complete: tokens (${tokenList}) swapped to SOL. Do NOT call swap_token again.`;
+
+            for (const s of zapResult.swaps) {
+              if (s.tx) {
+                notifySwap({
+                  inputSymbol: s.mint.slice(0, 8),
+                  outputSymbol: "SOL",
+                  amountIn: s.amount_in,
+                  amountOut: s.sol_received,
+                  tx: s.tx,
+                }).catch(() => {});
+              }
+            }
           }
         }
-      } else if (name === "claim_fees" && config.management.autoSwapAfterClaim && result.base_mint) {
-        await swapBaseToSolWithRetry(result.base_mint, "after claim");
+      } else if (name === "claim_fees" && config.management.autoSwapAfterClaim) {
+        const candidateMints = new Set();
+        if (Array.isArray(result.tokens_to_swap)) {
+          result.tokens_to_swap.forEach((m) => candidateMints.add(m));
+        }
+        if (result.base_mint) candidateMints.add(result.base_mint);
+        if (result.token_x_mint) candidateMints.add(result.token_x_mint);
+        if (result.token_y_mint) candidateMints.add(result.token_y_mint);
+
+        const zapResult = await zapOutTokensToSol({
+          mints: Array.from(candidateMints),
+          sweepWallet: false,
+          label: "after claim",
+        });
+
+        if (zapResult.swapped) {
+          for (const s of zapResult.swaps) {
+            if (s.tx) {
+              notifySwap({
+                inputSymbol: s.mint.slice(0, 8),
+                outputSymbol: "SOL",
+                amountIn: s.amount_in,
+                amountOut: s.sol_received,
+                tx: s.tx,
+              }).catch(() => {});
+            }
+          }
+        }
       }
     }
 

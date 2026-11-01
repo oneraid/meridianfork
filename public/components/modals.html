@@ -92,8 +92,7 @@
     <div class="modal-body" id="lesson-detail-body" style="display:flex;flex-direction:column;gap:0;max-height:65vh;overflow-y:auto;">
       <!-- Dynamically populated -->
     </div>
-    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
-      <button type="button" id="btn-apply-lesson-changes" onclick="applyCheckedConfigChanges()" class="btn-primary" style="display:none;">Terapkan Perubahan</button>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;align-items:center;">
       <button type="button" onclick="document.getElementById('lesson-detail-modal').close()" class="btn-ghost">Close</button>
     </div>
   </dialog>
@@ -211,3 +210,132 @@
       <button type="button" onclick="closeRpcDetailModal()" class="btn-ghost">Tutup</button>
     </div>
   </dialog>
+
+  <!-- Add RPC / API Key Modal -->
+  <dialog id="add-rpc-modal" class="meridian-modal" style="max-width:560px;width:95vw;">
+    <div class="modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;padding:18px 22px 14px 22px;border-bottom:1px solid var(--border-subtle);">
+      <div>
+        <div class="modal-title" style="display:flex;align-items:center;gap:8px;font-size:16px;">
+          <svg width="18" height="18" fill="none" stroke="var(--accent-light)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Tambah RPC Node / API Key
+        </div>
+        <div class="modal-subtitle" style="margin-top:4px;">Tambahkan endpoint atau API key Helius, Alchemy, QuickNode, atau custom RPC node untuk failover otomatis.</div>
+      </div>
+      <button type="button" onclick="document.getElementById('add-rpc-modal').close()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 8px;line-height:1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+    </div>
+    <form id="add-rpc-form" onsubmit="submitAddRpc(event)" style="padding:20px 22px;display:flex;flex-direction:column;gap:16px;">
+      
+      <!-- Provider Type Selector -->
+      <div class="form-group">
+        <label class="form-label" style="font-weight:700;margin-bottom:8px;">Pilih Provider / Tipe Node <span style="color:#ef4444;">*</span></label>
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;">
+          <label style="border:1.5px solid var(--accent-light);background:rgba(124,92,255,0.08);border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.2s;" id="label-prov-helius">
+            <input type="radio" name="rpc-provider-type" value="helius" checked style="display:none;" onchange="onRpcProviderChange('helius')">
+            <span style="font-size:20px;">⚡</span>
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary);">Helius</span>
+            <span style="font-size:10px;color:var(--text-muted);">Priority #1 / #2</span>
+          </label>
+          <label style="border:1px solid var(--border-subtle);background:var(--bg-elevated);border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.2s;" id="label-prov-alchemy">
+            <input type="radio" name="rpc-provider-type" value="alchemy" style="display:none;" onchange="onRpcProviderChange('alchemy')">
+            <span style="font-size:20px;">⚗️</span>
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary);">Alchemy</span>
+            <span style="font-size:10px;color:var(--text-muted);">Priority #3</span>
+          </label>
+          <label style="border:1px solid var(--border-subtle);background:var(--bg-elevated);border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;transition:all 0.2s;" id="label-prov-custom">
+            <input type="radio" name="rpc-provider-type" value="custom" style="display:none;" onchange="onRpcProviderChange('custom')">
+            <span style="font-size:20px;">🌐</span>
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary);">Custom RPC</span>
+            <span style="font-size:10px;color:var(--text-muted);">QuickNode, Triton, dll</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Input Value Field -->
+      <div class="form-group">
+        <label class="form-label" id="rpc-input-label" style="font-weight:700;margin-bottom:6px;">Helius API Key atau Full URL <span style="color:#ef4444;">*</span></label>
+        <input type="text" id="rpc-input-value" class="form-input" style="font-family:'JetBrains Mono',monospace;font-size:12px;height:40px;" placeholder="Contoh: 9c2a81fe-7237-44f1-94d8-8ee47baf1011" required autocomplete="off">
+        <div id="rpc-input-hint" style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+          Bisa masukkan API Key saja atau full URL Helius (https://mainnet.helius-rpc.com/?api-key=...). Otomatis ditambahkan ke failover list.
+        </div>
+      </div>
+
+      <!-- Optional Custom Label -->
+      <div class="form-group" id="rpc-name-group" style="display:none;">
+        <label class="form-label" style="font-weight:700;margin-bottom:6px;">Label / Catatan Node <span style="color:var(--text-muted);font-weight:400;">(Opsional)</span></label>
+        <input type="text" id="rpc-input-name" class="form-input" style="height:38px;" placeholder="Contoh: QuickNode Dedicated Europe">
+      </div>
+
+      <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:12px 14px;font-size:11px;color:var(--text-secondary);display:flex;align-items:flex-start;gap:10px;">
+        <svg width="15" height="15" fill="none" stroke="var(--accent-light)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Endpoint akan disimpan ke <code style="color:var(--accent-light);font-weight:700;">.env</code> dan langsung aktif untuk auto-failover bot tanpa perlu restart manual.</span>
+      </div>
+
+      <div class="modal-footer" style="padding:14px 0 0 0;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--border-subtle);margin-top:4px;">
+        <button type="button" onclick="document.getElementById('add-rpc-modal').close()" class="btn-ghost">Batal</button>
+        <button type="submit" id="btn-submit-add-rpc" class="btn-primary" style="display:flex;align-items:center;gap:6px;padding:8px 18px;font-weight:700;">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          Simpan &amp; Aktifkan Node
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Position Recap Card Modal -->
+  <dialog id="share-card-modal" class="meridian-modal" style="max-width: 920px; width: 95%;">
+    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
+          <span>📸</span> Position Recap Card
+        </div>
+        <div class="modal-subtitle">Official Metlex-style DLMM performance recap card for sharing.</div>
+      </div>
+      <button type="button" onclick="document.getElementById('share-card-modal').close()" class="btn-ghost btn-xs" style="font-size:16px;cursor:pointer;">✕</button>
+    </div>
+    <div class="modal-body" style="padding: 16px 20px; display:flex; flex-direction:column; align-items:center;">
+      <div id="share-card-loading" style="text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;">
+        <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+        Generating high-res recap card...
+      </div>
+      <div id="share-card-container" style="display:none;width:100%;text-align:center;">
+        <img id="share-card-img" style="max-width:100%;height:auto;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.08);" alt="Position Recap Card" />
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;">
+      <span id="share-card-copied" style="font-size:12px;color:var(--success);display:none;font-weight:700;">✓ Copied to clipboard!</span>
+      <div style="display:flex;gap:10px;margin-left:auto;">
+        <button type="button" id="btn-copy-card" class="btn-ghost" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Copy Image
+        </button>
+        <button type="button" id="btn-download-card" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Download (.PNG)
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Cooldown List Modal -->
+  <dialog id="cooldown-modal" class="meridian-modal" style="max-width: 680px; width: 95%;">
+    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
+          <svg width="18" height="18" fill="none" stroke="#c084fc" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Daftar Token &amp; Pool Cooldown
+        </div>
+        <div class="modal-subtitle">Token atau pool di bawah ini sedang dalam status cooldown proteksi dan sementara tidak akan dimasuki bot.</div>
+      </div>
+      <button type="button" onclick="document.getElementById('cooldown-modal').close()" class="btn-ghost btn-xs" style="font-size:16px;cursor:pointer;padding:4px 8px;">✕</button>
+    </div>
+    <div class="modal-body" id="cooldown-modal-body" style="padding: 16px 20px; max-height: 65vh; overflow-y: auto;">
+      <!-- Dynamically populated -->
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;">
+      <button type="button" id="modal-btn-reset-all" onclick="resetCooldown()" class="btn-sm" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:none;align-items:center;gap:6px;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Reset Semua Cooldown
+      </button>
+      <button type="button" onclick="document.getElementById('cooldown-modal').close()" class="btn-ghost" style="margin-left:auto;">Tutup</button>
+    </div>
+  </dialog>
+

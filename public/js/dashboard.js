@@ -66,8 +66,15 @@
     let pnlCalendarState = {
       year: new Date().getFullYear(),
       month: new Date().getMonth(),
+      unit: localStorage.getItem("meridian_pnl_unit") || "sol",
       daily: {},
       allTime: {}
+    };
+
+    window.setPnlCalendarUnit = function(unit) {
+      pnlCalendarState.unit = unit;
+      localStorage.setItem("meridian_pnl_unit", unit);
+      renderPnlCalendar();
     };
 
     const MONTH_NAMES = [
@@ -121,9 +128,27 @@
 
     // Render PnL Calendar
     function renderPnlCalendar() {
-      const { year, month, daily } = pnlCalendarState;
+      const { year, month, daily, unit } = pnlCalendarState;
+      const isSol = unit === "sol";
       const container = document.getElementById("pnl-calendar-container");
       if (!container) return;
+
+      // Update Unit Switcher Buttons
+      const solBtn = document.getElementById("pnl-unit-sol-btn");
+      const usdBtn = document.getElementById("pnl-unit-usd-btn");
+      if (solBtn && usdBtn) {
+        if (isSol) {
+          solBtn.style.background = "var(--accent, #6366f1)";
+          solBtn.style.color = "#fff";
+          usdBtn.style.background = "transparent";
+          usdBtn.style.color = "var(--text-secondary, #94a3b8)";
+        } else {
+          usdBtn.style.background = "var(--accent, #6366f1)";
+          usdBtn.style.color = "#fff";
+          solBtn.style.background = "transparent";
+          solBtn.style.color = "var(--text-secondary, #94a3b8)";
+        }
+      }
 
       // Update Month Title
       const monthTitleEl = document.getElementById("pnl-cal-month-title");
@@ -134,7 +159,9 @@
       // Calculate stats for selected month
       const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
       let monthPnl = 0;
+      let monthPnlSol = 0;
       let monthFees = 0;
+      let monthFeesSol = 0;
       let monthTrades = 0;
       let monthWins = 0;
       let monthLosses = 0;
@@ -144,21 +171,26 @@
       let bestDay = null;
       let worstDay = null;
 
+      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 85;
+
       for (const dayKey in daily) {
         if (dayKey.startsWith(monthPrefix)) {
           const d = daily[dayKey];
           monthPnl += d.pnl_usd;
+          const daySol = d.pnl_sol != null ? d.pnl_sol : (solPrice > 0 ? d.pnl_usd / solPrice : 0);
+          monthPnlSol += daySol;
           monthFees += d.fees_usd;
+          monthFeesSol += (d.fees_sol != null ? d.fees_sol : (solPrice > 0 ? d.fees_usd / solPrice : 0));
           monthTrades += d.trades_count;
           monthWins += d.wins;
           monthLosses += d.losses;
 
           if (d.pnl_usd > 0) {
             greenDays++;
-            if (!bestDay || d.pnl_usd > bestDay.pnl) bestDay = { date: dayKey, pnl: d.pnl_usd };
+            if (!bestDay || d.pnl_usd > bestDay.pnl) bestDay = { date: dayKey, pnl: d.pnl_usd, pnlSol: daySol };
           } else if (d.pnl_usd < 0) {
             redDays++;
-            if (!worstDay || d.pnl_usd < worstDay.pnl) worstDay = { date: dayKey, pnl: d.pnl_usd };
+            if (!worstDay || d.pnl_usd < worstDay.pnl) worstDay = { date: dayKey, pnl: d.pnl_usd, pnlSol: daySol };
           } else if (d.trades_count > 0) {
             flatDays++;
           }
@@ -167,8 +199,7 @@
 
       const totalClosedMonth = monthWins + monthLosses;
       const monthWinRate = totalClosedMonth > 0 ? ((monthWins / totalClosedMonth) * 100).toFixed(1) : "0.0";
-      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 150;
-      const monthPnlSol = (monthPnl / solPrice).toFixed(3);
+      const monthPnlSolStr = (monthPnlSol >= 0 ? "+" : "") + monthPnlSol.toFixed(4);
 
       // Render Month Summary Top Header Badges
       const summaryEl = document.getElementById("pnl-cal-month-summary");
@@ -178,8 +209,8 @@
         summaryEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:4px 12px;">
             <span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Bulan Ini:</span>
-            <span style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:${pnlColor};">${pnlSign}$${monthPnl.toFixed(2)}</span>
-            <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">(${pnlSign}${monthPnlSol} ◎)</span>
+            <span style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:${pnlColor};">${isSol ? `${monthPnlSolStr} ◎` : `${pnlSign}$${monthPnl.toFixed(2)}`}</span>
+            <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">(${isSol ? `${pnlSign}$${monthPnl.toFixed(2)}` : `${monthPnlSolStr} ◎`})</span>
           </div>
         `;
       }
@@ -191,9 +222,9 @@
         const pnlSign = monthPnl >= 0 ? "+" : "";
         statsStrip.innerHTML = `
           <div class="pnl-cal-stat-pill">
-            <span class="pnl-cal-stat-label">Net Realized PnL</span>
-            <span class="pnl-cal-stat-val" style="color:${pnlColor};">${pnlSign}$${monthPnl.toFixed(2)}</span>
-            <span class="pnl-cal-stat-sub">${pnlSign}${monthPnlSol} SOL</span>
+            <span class="pnl-cal-stat-label">Hasil Bersih Riil (${isSol ? 'SOL' : 'USD'})</span>
+            <span class="pnl-cal-stat-val" style="color:${pnlColor};">${isSol ? `${monthPnlSolStr} ◎` : `${pnlSign}$${monthPnl.toFixed(2)}`}</span>
+            <span class="pnl-cal-stat-sub">${isSol ? `${pnlSign}$${monthPnl.toFixed(2)} USD` : `${monthPnlSolStr} SOL`}</span>
           </div>
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Win Rate (${monthWins}W / ${monthLosses}L)</span>
@@ -211,15 +242,15 @@
           </div>
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Total Fee Earned</span>
-            <span class="pnl-cal-stat-val" style="color:var(--success);">+$${monthFees.toFixed(2)}</span>
-            <span class="pnl-cal-stat-sub">Klaim LP Otomatis</span>
+            <span class="pnl-cal-stat-val" style="color:var(--success);">${isSol ? `+${monthFeesSol.toFixed(4)} ◎` : `+$${monthFees.toFixed(2)}`}</span>
+            <span class="pnl-cal-stat-sub">${isSol ? `+$${monthFees.toFixed(2)} USD` : `+${monthFeesSol.toFixed(4)} SOL`}</span>
           </div>
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Best / Worst Day</span>
             <span class="pnl-cal-stat-val" style="font-size:13px;">
-              <span style="color:var(--success);">${bestDay ? `+$${bestDay.pnl.toFixed(2)}` : '--'}</span>
+              <span style="color:var(--success);">${bestDay ? (isSol ? (bestDay.pnlSol >= 0 ? `+${bestDay.pnlSol.toFixed(3)} ◎` : `${bestDay.pnlSol.toFixed(3)} ◎`) : `+$${bestDay.pnl.toFixed(2)}`) : '--'}</span>
               <span style="color:var(--text-muted); margin:0 3px;">/</span>
-              <span style="color:#ff6b8a;">${worstDay ? `-$${Math.abs(worstDay.pnl).toFixed(2)}` : '--'}</span>
+              <span style="color:#ff6b8a;">${worstDay ? (isSol ? `${worstDay.pnlSol.toFixed(3)} ◎` : `-$${Math.abs(worstDay.pnl).toFixed(2)}`) : '--'}</span>
             </span>
             <span class="pnl-cal-stat-sub">Peak Profit / Drawdown</span>
           </div>
@@ -256,7 +287,9 @@
 
       for (let w = 0; w < numWeeks; w++) {
         let weekPnl = 0;
+        let weekPnlSol = 0;
         let weekFees = 0;
+        let weekFeesSol = 0;
         let weekWins = 0;
         let weekLosses = 0;
         let weekTradesCount = 0;
@@ -307,13 +340,16 @@
               const pnlSign = pnlVal > 0 ? "+" : (pnlVal < 0 ? "-" : "");
               const valClass = pnlVal > 0 ? "pos" : (pnlVal < 0 ? "neg" : "zero");
               const absVal = Math.abs(pnlVal).toFixed(2);
-              const solVal = solPrice > 0 ? (pnlVal / solPrice) : 0;
+              const solVal = dayData.pnl_sol != null ? dayData.pnl_sol : (solPrice > 0 ? (pnlVal / solPrice) : 0);
+              const solSign = solVal > 0 ? "+" : (solVal < 0 ? "-" : "");
               const absSol = Math.abs(solVal) >= 1 ? Math.abs(solVal).toFixed(3) : Math.abs(solVal).toFixed(4);
               const tradeCountText = `${dayData.trades_count} pos`;
 
               // Accumulate week stats
               weekPnl += pnlVal;
+              weekPnlSol += solVal;
               weekFees += dayData.fees_usd || 0;
+              weekFeesSol += (dayData.fees_sol != null ? dayData.fees_sol : (solPrice > 0 ? dayData.fees_usd / solPrice : 0));
               weekWins += wins;
               weekLosses += losses;
               weekTradesCount += dayData.trades_count;
@@ -321,8 +357,11 @@
                 weekTradesList.push(...dayData.trades);
               }
 
+              const primaryText = isSol ? `${solSign}${absSol} ◎` : `${pnlSign}$${absVal}`;
+              const secondaryText = isSol ? `${pnlSign}$${absVal}` : `${solSign}${absSol} SOL`;
+
               weekDaysHtml += `
-                <div class="${cellCls}" onclick="openPnlDayDetail('${dayKey}')" title="${dayKey}: ${pnlSign}$${absVal} USD (${pnlSign}${absSol} SOL) · ${dayData.trades_count} posisi — ${wins} Win, ${losses} Loss, WR: ${dayWinRate}%">
+                <div class="${cellCls}" onclick="openPnlDayDetail('${dayKey}')" title="${dayKey}: ${solSign}${absSol} SOL (${pnlSign}$${absVal} USD) · ${dayData.trades_count} posisi — ${wins} Win, ${losses} Loss, WR: ${dayWinRate}%">
                   <div class="pnl-cell-header">
                     <span class="pnl-cell-num">${dayNum}</span>
                     <div style="display:flex; align-items:center; gap:3px;">
@@ -332,8 +371,8 @@
                   </div>
                   <div class="pnl-cell-body">
                     <div class="pnl-cell-val-row">
-                      <span class="pnl-cell-val ${valClass}">${pnlSign}$${absVal}</span>
-                      <span class="pnl-cell-sol ${valClass}">${pnlSign}${absSol} SOL</span>
+                      <span class="pnl-cell-val ${valClass}">${primaryText}</span>
+                      <span class="pnl-cell-sol ${valClass}">${secondaryText}</span>
                     </div>
                     <div class="pnl-cell-footer-stats">
                       <div class="pnl-cell-wl">
@@ -383,7 +422,8 @@
           const weekValClass = weekPnl > 0 ? "pos" : (weekPnl < 0 ? "neg" : "zero");
           const weekTagClass = weekPnl > 0 ? "profit" : (weekPnl < 0 ? "loss" : "neutral");
           const weekAbsVal = Math.abs(weekPnl).toFixed(2);
-          const weekSolVal = solPrice > 0 ? (weekPnl / solPrice) : 0;
+          const weekSolVal = weekPnlSol;
+          const weekSolSign = weekSolVal > 0 ? "+" : (weekSolVal < 0 ? "-" : "");
           const weekAbsSol = Math.abs(weekSolVal) >= 1 ? Math.abs(weekSolVal).toFixed(3) : Math.abs(weekSolVal).toFixed(4);
           const totalWeekClosed = weekWins + weekLosses;
           const weekWinRate = totalWeekClosed > 0 ? ((weekWins / totalWeekClosed) * 100).toFixed(0) : "0";
@@ -394,7 +434,9 @@
             weekNum,
             dateRangeLabel,
             weekPnl,
+            weekPnlSol,
             weekFees,
+            weekFeesSol,
             weekWins,
             weekLosses,
             weekTradesCount,
@@ -402,15 +444,18 @@
             trades: weekTradesList
           };
 
+          const weeklyPrimary = isSol ? `◎ ${weekSolSign}${weekAbsSol}` : `${weekPnlSign}$${weekAbsVal}`;
+          const weeklySecondary = isSol ? `${weekPnlSign}$${weekAbsVal} USD` : `◎ ${weekSolSign}${weekAbsSol} SOL`;
+
           weekCellHtml = `
-            <div class="${weekCls}" onclick="openPnlWeekDetail('${weekKey}')" title="Total Minggu ${weekNum} (${dateRangeLabel}): ${weekPnlSign}$${weekAbsVal} USD (${weekPnlSign}${weekAbsSol} SOL) · ${weekTradesCount} posisi — ${weekWins} Win, ${weekLosses} Loss, WR: ${weekWinRate}%">
+            <div class="${weekCls}" onclick="openPnlWeekDetail('${weekKey}')" title="Total Minggu ${weekNum} (${dateRangeLabel}): ${weekSolSign}${weekAbsSol} SOL (${weekPnlSign}$${weekAbsVal} USD) · ${weekTradesCount} posisi — ${weekWins} Win, ${weekLosses} Loss, WR: ${weekWinRate}%">
               <div class="pnl-weekly-header-bar">
                 <span class="pnl-weekly-tag ${weekTagClass}">W${weekNum} • TOTAL</span>
                 <span class="pnl-weekly-dates">${dateRangeLabel}</span>
               </div>
               <div class="pnl-weekly-val-box">
-                <span class="pnl-weekly-usd-val ${weekValClass}">${weekPnlSign}$${weekAbsVal}</span>
-                <span class="pnl-weekly-sol-chip ${weekValClass}">◎ ${weekPnlSign}${weekAbsSol} SOL</span>
+                <span class="pnl-weekly-usd-val ${weekValClass}">${weeklyPrimary}</span>
+                <span class="pnl-weekly-sol-chip ${weekValClass}">${weeklySecondary}</span>
               </div>
               <div class="pnl-weekly-footer">
                 <div class="pnl-cell-wl">
@@ -430,8 +475,8 @@
                 <span class="pnl-weekly-dates">${dateRangeLabel}</span>
               </div>
               <div class="pnl-weekly-val-box" style="opacity:0.35;">
-                <span style="font-family:'Space Grotesk'; font-size:12px; font-weight:700; color:var(--text-muted);">$0.00</span>
-                <span class="pnl-weekly-sol-chip zero">◎ 0.000 SOL</span>
+                <span style="font-family:'Space Grotesk'; font-size:12px; font-weight:700; color:var(--text-muted);">${isSol ? '◎ 0.000' : '$0.00'}</span>
+                <span class="pnl-weekly-sol-chip zero">${isSol ? '$0.00 USD' : '◎ 0.000 SOL'}</span>
               </div>
               <div class="pnl-weekly-footer" style="opacity:0.3;">
                 <span style="font-size:8px; color:var(--text-muted);">0 posisi</span>
@@ -478,18 +523,19 @@
         titleWrap.appendChild(outcomeTag);
         titleWrap.appendChild(titleDiv);
 
-        const tSol = solPrice > 0 ? (t.pnl_usd / solPrice) : 0;
+        const tSol = t.pnl_sol != null ? Number(t.pnl_sol) : (solPrice > 0 ? (t.pnl_usd / solPrice) : 0);
         const tSolSign = tSol >= 0 ? "+" : "-";
-        const tAbsSol = Math.abs(tSol) >= 1 ? Math.abs(tSol).toFixed(3) : Math.abs(tSol).toFixed(4);
+        const tAbsSol = Math.abs(tSol).toFixed(4);
+        const isSol = pnlCalendarState.unit === "sol";
 
         const pnlBadge = document.createElement("div");
         pnlBadge.style.cssText = "text-align:right;";
         pnlBadge.innerHTML = `
           <div style="font-family:'Space Grotesk'; font-size:13px; font-weight:700; color:${isPos ? 'var(--success)' : '#ff6b8a'};">
-            ${isPos ? '+' : ''}$${t.pnl_usd.toFixed(2)} (${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct.toFixed(2)}%)
+            ${isSol ? `${tSolSign}${tAbsSol} ◎` : `${isPos ? '+' : ''}$${t.pnl_usd.toFixed(2)}`} <span style="font-size:11px; opacity:0.85;">(${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct.toFixed(2)}%)</span>
           </div>
           <div style="font-family:'JetBrains Mono'; font-size:10.5px; font-weight:600; color:${isPos ? '#5eead4' : '#fca5a5'}; opacity:0.88;">
-            ${tSolSign}${tAbsSol} SOL
+            ${isSol ? `${isPos ? '+' : ''}$${t.pnl_usd.toFixed(2)} USD` : `${tSolSign}${tAbsSol} SOL`}
           </div>
         `;
 
@@ -502,13 +548,21 @@
         metaRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-secondary); flex-wrap:wrap; gap:6px;";
 
         const leftMeta = document.createElement("div");
-        leftMeta.style.cssText = "display:flex; gap:12px;";
+        leftMeta.style.cssText = "display:flex; gap:12px; align-items:center;";
+        if (t.amount_sol > 0) {
+          const depSpan = document.createElement("span");
+          depSpan.innerHTML = `Modal: <strong style="color:#fff;">${t.amount_sol} SOL</strong>`;
+          leftMeta.appendChild(depSpan);
+        }
         const feeSpan = document.createElement("span");
         feeSpan.innerHTML = `Fee: <strong style="color:var(--success);">+$${Number(t.fees_usd || 0).toFixed(4)}</strong>`;
-        const durSpan = document.createElement("span");
-        durSpan.textContent = t.minutes_held ? `Durasi: ${t.minutes_held}m` : "";
         leftMeta.appendChild(feeSpan);
-        if (t.minutes_held) leftMeta.appendChild(durSpan);
+
+        if (t.minutes_held) {
+          const durSpan = document.createElement("span");
+          durSpan.textContent = `Durasi: ${t.minutes_held}m`;
+          leftMeta.appendChild(durSpan);
+        }
 
         const reasonSpan = document.createElement("div");
         reasonSpan.style.cssText = "font-size:10px; font-family:'JetBrains Mono'; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:2px 8px; border-radius:4px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
@@ -534,21 +588,24 @@
         return;
       }
 
-      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 150;
+      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 95.75;
       const isPos = dayData.pnl_usd >= 0;
-      const solVal = solPrice > 0 ? (dayData.pnl_usd / solPrice) : 0;
+      let solVal = dayData.pnl_sol != null ? dayData.pnl_sol : (solPrice > 0 ? (dayData.pnl_usd / solPrice) : 0);
+      if (Math.abs(dayData.pnl_usd) > 0.05 && Math.sign(solVal) !== Math.sign(dayData.pnl_usd)) {
+        solVal = dayData.pnl_usd / solPrice;
+      }
       const solSign = solVal >= 0 ? "+" : "-";
-      const absSol = Math.abs(solVal) >= 1 ? Math.abs(solVal).toFixed(3) : Math.abs(solVal).toFixed(4);
+      const absSol = Math.abs(solVal).toFixed(4);
 
       // Format Date Header (e.g. 21 Agustus 2026)
       const [y, m, d] = dateStr.split("-").map(Number);
       const dateFormatted = `${d} ${MONTH_NAMES[m - 1]} ${y}`;
       safeText("pnl-day-modal-title", `PnL Detail — ${dateFormatted}`);
-      safeText("pnl-day-modal-subtitle", "Performance breakdown untuk posisi ditutup pada tanggal ini");
+      safeText("pnl-day-modal-subtitle", "Hasil bersih riil (net of IL & slippage) untuk posisi ditutup pada tanggal ini");
 
       const badgeEl = document.getElementById("pnl-day-modal-badge");
       if (badgeEl) {
-        badgeEl.textContent = `${isPos ? '+' : ''}$${dayData.pnl_usd.toFixed(2)} USD (${solSign}${absSol} SOL)`;
+        badgeEl.textContent = `${solSign}${absSol} ◎ (${isPos ? '+' : ''}$${dayData.pnl_usd.toFixed(2)} USD)`;
         badgeEl.style.background = isPos ? "rgba(16,217,160,0.15)" : "rgba(255,77,109,0.15)";
         badgeEl.style.color = isPos ? "var(--success)" : "#ff6b8a";
         badgeEl.style.border = `1px solid ${isPos ? 'rgba(16,217,160,0.3)' : 'rgba(255,77,109,0.3)'}`;
@@ -560,9 +617,9 @@
         const winrate = dayData.trades_count > 0 ? ((dayData.wins / dayData.trades_count) * 100).toFixed(0) : "0";
         statsContainer.innerHTML = `
           <div class="pnl-cal-stat-pill">
-            <span class="pnl-cal-stat-label">Net Realized PnL</span>
-            <span class="pnl-cal-stat-val" style="color:${isPos ? 'var(--success)' : '#ff6b8a'};">${isPos ? '+' : ''}$${dayData.pnl_usd.toFixed(2)}</span>
-            <span class="pnl-cal-stat-sub">${solSign}${absSol} SOL · ${dayData.trades_count} total posisi</span>
+            <span class="pnl-cal-stat-label">Hasil Bersih Riil</span>
+            <span class="pnl-cal-stat-val" style="color:${isPos ? 'var(--success)' : '#ff6b8a'};">${solSign}${absSol} ◎</span>
+            <span class="pnl-cal-stat-sub">${isPos ? '+' : ''}$${dayData.pnl_usd.toFixed(2)} USD · ${dayData.trades_count} posisi</span>
           </div>
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Win Rate & Breakdown</span>
@@ -572,7 +629,7 @@
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Claimed Fees</span>
             <span class="pnl-cal-stat-val" style="color:var(--success);">+$${dayData.fees_usd.toFixed(4)}</span>
-            <span class="pnl-cal-stat-sub">Fee perdagangan LP harian</span>
+            <span class="pnl-cal-stat-sub">${dayData.fees_sol ? `+${dayData.fees_sol.toFixed(4)} SOL · ` : ''}Fee LP terkumpul</span>
           </div>
         `;
       }
@@ -592,18 +649,21 @@
         return;
       }
 
-      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 150;
+      const solPrice = Number(dashboardState.pnlCalendar?.sol_price) || Number(dashboardState.status?.wallet?.sol_price) || 95.75;
       const isPos = weekData.weekPnl >= 0;
-      const solVal = solPrice > 0 ? (weekData.weekPnl / solPrice) : 0;
+      let solVal = weekData.weekPnlSol != null ? weekData.weekPnlSol : (solPrice > 0 ? (weekData.weekPnl / solPrice) : 0);
+      if (Math.abs(weekData.weekPnl) > 0.05 && Math.sign(solVal) !== Math.sign(weekData.weekPnl)) {
+        solVal = weekData.weekPnl / solPrice;
+      }
       const solSign = solVal >= 0 ? "+" : "-";
-      const absSol = Math.abs(solVal) >= 1 ? Math.abs(solVal).toFixed(3) : Math.abs(solVal).toFixed(4);
+      const absSol = Math.abs(solVal).toFixed(4);
 
       safeText("pnl-day-modal-title", `PnL Detail — Minggu ${weekData.weekNum} (${weekData.dateRangeLabel})`);
-      safeText("pnl-day-modal-subtitle", `Performance breakdown untuk seluruh posisi ditutup pada Minggu ke-${weekData.weekNum}`);
+      safeText("pnl-day-modal-subtitle", `Hasil bersih riil seluruh posisi ditutup pada Minggu ke-${weekData.weekNum}`);
 
       const badgeEl = document.getElementById("pnl-day-modal-badge");
       if (badgeEl) {
-        badgeEl.textContent = `${isPos ? '+' : ''}$${weekData.weekPnl.toFixed(2)} USD (${solSign}${absSol} SOL)`;
+        badgeEl.textContent = `${solSign}${absSol} ◎ (${isPos ? '+' : ''}$${weekData.weekPnl.toFixed(2)} USD)`;
         badgeEl.style.background = isPos ? "rgba(16,217,160,0.15)" : "rgba(255,77,109,0.15)";
         badgeEl.style.color = isPos ? "var(--success)" : "#ff6b8a";
         badgeEl.style.border = `1px solid ${isPos ? 'rgba(16,217,160,0.3)' : 'rgba(255,77,109,0.3)'}`;
@@ -613,9 +673,9 @@
       if (statsContainer) {
         statsContainer.innerHTML = `
           <div class="pnl-cal-stat-pill">
-            <span class="pnl-cal-stat-label">Total Realized PnL</span>
-            <span class="pnl-cal-stat-val" style="color:${isPos ? 'var(--success)' : '#ff6b8a'};">${isPos ? '+' : ''}$${weekData.weekPnl.toFixed(2)}</span>
-            <span class="pnl-cal-stat-sub">${solSign}${absSol} SOL · ${weekData.weekTradesCount} posisi</span>
+            <span class="pnl-cal-stat-label">Total Hasil Bersih</span>
+            <span class="pnl-cal-stat-val" style="color:${isPos ? 'var(--success)' : '#ff6b8a'};">${solSign}${absSol} ◎</span>
+            <span class="pnl-cal-stat-sub">${isPos ? '+' : ''}$${weekData.weekPnl.toFixed(2)} USD · ${weekData.weekTradesCount} posisi</span>
           </div>
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Win Rate & Breakdown</span>
@@ -625,7 +685,7 @@
           <div class="pnl-cal-stat-pill">
             <span class="pnl-cal-stat-label">Claimed Fees</span>
             <span class="pnl-cal-stat-val" style="color:var(--success);">+$${weekData.weekFees.toFixed(4)}</span>
-            <span class="pnl-cal-stat-sub">Fee perdagangan LP mingguan</span>
+            <span class="pnl-cal-stat-sub">${weekData.weekFeesSol ? `+${weekData.weekFeesSol.toFixed(4)} SOL · ` : ''}Fee LP terkumpul</span>
           </div>
         `;
       }

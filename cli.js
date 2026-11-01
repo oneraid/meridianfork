@@ -89,6 +89,12 @@ Closes a position. Auto-swaps base token to SOL unless --skip-swap.
 Output: { success, pnl_pct, pnl_usd, txs, base_mint }
 \`\`\`
 
+### meridian zap-out [--token <mint>] [--dry-run]
+Zaps out all unswapped position tokens / wallet tokens back to SOL.
+\`\`\`
+Output: { swapped, swaps, total_sol_received }
+\`\`\`
+
 ### meridian swap --from <mint> --to <mint> --amount <n> [--dry-run]
 Swaps tokens via Jupiter. Use "SOL" as mint shorthand.
 \`\`\`
@@ -477,6 +483,19 @@ switch (subcommand) {
     break;
   }
 
+  // ── zap-out / sweep ───────────────────────────────────────────────
+  case "zap-out":
+  case "sweep": {
+    const { zapOutTokensToSol } = await import("./tools/executor.js");
+    const mint = flags.mint || flags.token || null;
+    out(await zapOutTokensToSol({
+      mints: mint ? [mint] : [],
+      sweepWallet: true,
+      label: "cli zap-out",
+    }));
+    break;
+  }
+
   // ── swap ─────────────────────────────────────────────────────────
   case "swap": {
     if (!flags.from || !flags.to || !flags.amount) die("Usage: meridian swap --from <mint> --to <mint> --amount <n>");
@@ -549,6 +568,14 @@ switch (subcommand) {
       const { addLesson } = await import("./lessons.js");
       addLesson(text, [], { pinned: false, role: null });
       out({ saved: true, rule: text, outcome: "manual", role: null });
+    } else if (sub2 === "prune-bad" || sub2 === "clear-bad") {
+      const { clearBadLessons } = await import("./lessons.js");
+      const count = clearBadLessons();
+      out({ pruned: count, message: `${count} negative lesson(s) pruned.` });
+    } else if (sub2 === "clear-all") {
+      const { clearAllLessons } = await import("./lessons.js");
+      const count = clearAllLessons();
+      out({ cleared: count, message: `${count} lesson(s) cleared.` });
     } else {
       const { listLessons } = await import("./lessons.js");
       const limit = flags.limit ? parseInt(flags.limit) : 50;
@@ -559,11 +586,24 @@ switch (subcommand) {
 
   // ── pool-memory ──────────────────────────────────────────────────
   case "pool-memory": {
-    if (!flags.pool) die("Usage: meridian pool-memory --pool <addr>");
+    if (flags["reset-cooldown"] || flags.reset) {
+      const { resetCooldowns } = await import("./pool-memory.js");
+      out(resetCooldowns({ poolAddress: flags.pool, all: !flags.pool }));
+      break;
+    }
+    if (!flags.pool) die("Usage: meridian pool-memory --pool <addr> (or --reset to reset cooldowns)");
     const { getPoolMemory } = await import("./pool-memory.js");
     out(getPoolMemory({ pool_address: flags.pool }));
     break;
   }
+
+  // ── reset-cooldown ───────────────────────────────────────────────
+  case "reset-cooldown": {
+    const { resetCooldowns } = await import("./pool-memory.js");
+    out(resetCooldowns({ poolAddress: flags.pool, baseMint: flags.mint, all: Boolean(flags.all || (!flags.pool && !flags.mint)) }));
+    break;
+  }
+
 
   // ── evolve ───────────────────────────────────────────────────────
   case "evolve": {

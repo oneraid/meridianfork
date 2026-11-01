@@ -64,24 +64,25 @@ let csrfToken = "";
 
     // Tab switching
     function switchTab(tabId) {
-      const tabs = ["dashboard", "positions", "decisions", "lessons", "config"];
+      const tabs = ["dashboard", "positions", "smartlp", "decisions", "lessons", "config"];
       tabs.forEach(t => {
         const btn = document.getElementById(`tab-btn-${t}`);
         const view = document.getElementById(`view-${t}`);
         if (t === tabId) {
-          btn.classList.add("active");
-          view.style.display = "";
+          btn && btn.classList.add("active");
+          view && (view.style.display = "");
         } else {
-          btn.classList.remove("active");
-          view.style.display = "none";
+          btn && btn.classList.remove("active");
+          view && (view.style.display = "none");
         }
       });
 
       const titles = {
         dashboard: "Overview",
         positions: "LP Positions",
-        decisions: "Decisions & Logs",
-        lessons: "Lessons & Performance",
+        smartlp: "Smart LP — Target Wallet Tracker & Copier",
+        decisions: "Decisions & Lessons",
+        lessons: "Solana RPC",
         config: "Configuration Settings"
       };
       safeText("view-title", titles[tabId]);
@@ -89,11 +90,17 @@ let csrfToken = "";
       if (tabId === "dashboard") {
         if (typeof loadPnlCalendar === "function") loadPnlCalendar();
       }
+      if (tabId === "smartlp") {
+        if (typeof loadSmartLp === "function") loadSmartLp();
+      }
       if (tabId === "decisions") {
         loadDecisions();
         loadCandidates();
+        loadLessons();
       }
-      if (tabId === "lessons") loadLessons();
+      if (tabId === "lessons") {
+        if (typeof loadRpcPage === "function") loadRpcPage();
+      }
       if (tabId === "config") loadConfig();
     }
 

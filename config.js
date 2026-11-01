@@ -100,6 +100,7 @@ export const config = {
     maxTokenAgeHours:   u.maxTokenAgeHours   ?? null, // null = no maximum
     minPctBelowAth:     u.minPctBelowAth !== undefined ? u.minPctBelowAth : 30,
     athSource:          u.athSource          || "meteora", // meteora | gmgn | both
+    athTimeframe:       u.athTimeframe       || "1h",
   },
 
   // ─── Position Management ────────────────
@@ -333,6 +334,7 @@ export function reloadScreeningThresholds() {
     if (fresh.blockedLaunchpads !== undefined) s.blockedLaunchpads = fresh.blockedLaunchpads;
     if (fresh.minPctBelowAth !== undefined) s.minPctBelowAth = fresh.minPctBelowAth;
     if (fresh.athSource !== undefined) s.athSource = fresh.athSource;
+    if (fresh.athTimeframe !== undefined) s.athTimeframe = fresh.athTimeframe;
     const minBinsBelow = numericConfig(fresh.minBinsBelow) ?? config.strategy.minBinsBelow;
     const maxBinsBelow = numericConfig(fresh.maxBinsBelow) ?? numericConfig(fresh.binsBelow) ?? config.strategy.maxBinsBelow;
     const defaultBinsBelow = numericConfig(fresh.defaultBinsBelow) ?? numericConfig(fresh.binsBelow) ?? config.strategy.defaultBinsBelow ?? maxBinsBelow;

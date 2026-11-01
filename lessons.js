@@ -564,6 +564,22 @@ export function removeLessonsByKeyword(keyword) {
 }
 
 /**
+ * Clear BAD/negative lessons (bad, poor, failed).
+ * Keeps good, manual, neutral, and pinned lessons intact to prevent LLM trauma.
+ */
+export function clearBadLessons({ preservePinned = true } = {}) {
+  const data = load();
+  const before = data.lessons.length;
+  data.lessons = data.lessons.filter((l) => {
+    if (preservePinned && l.pinned) return true;
+    const outcome = (l.outcome || "").toLowerCase();
+    return outcome !== "bad" && outcome !== "poor" && outcome !== "failed";
+  });
+  save(data);
+  return before - data.lessons.length;
+}
+
+/**
  * Clear ALL lessons (keeps performance data).
  */
 export function clearAllLessons() {

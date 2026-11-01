@@ -266,6 +266,7 @@ function buildPosition(f, prices, solUsd, meteora, solMode) {
     bin_step:           f.binStep ?? 100,
     strategy:           tracked?.strategy ?? null,
     decimal_multiplier: f.decimalMultiplier ?? 1,
+    has_liquidity:      (safeNum(f.xRaw) > 0 || safeNum(f.yRaw) > 0 || safeNum(f.feeXRaw) > 0 || safeNum(f.feeYRaw) > 0),
   };
 }
 
@@ -338,7 +339,8 @@ export async function computePositions(walletAddress) {
   const positions = allPositions.filter((p) => {
     const hasValue = (p.total_value_usd != null && p.total_value_usd > 0) || (p.total_value_true_usd != null && p.total_value_true_usd > 0);
     const hasFees = (p.unclaimed_fees_usd != null && p.unclaimed_fees_usd > 0) || (p.unclaimed_fees_true_usd != null && p.unclaimed_fees_true_usd > 0);
-    return hasValue || hasFees;
+    const hasLiquidity = p.has_liquidity === true;
+    return hasValue || hasFees || hasLiquidity;
   });
 
   return { wallet: walletAddress, total_positions: positions.length, positions, source: "rpc" };

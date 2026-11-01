@@ -1,68 +1,161 @@
 <div id="view-lessons" style="display:none;">
 
-          <!-- Perf Summary Cards -->
-          <div class="perf-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
-            <div class="metric-card accent-purple">
-              <div class="metric-label">Closed Positions</div>
-              <div class="metric-value" id="perf-closed-count">--</div>
-            </div>
-            <div class="metric-card accent-green">
-              <div class="metric-label">Win Rate</div>
-              <div class="metric-value" id="perf-win-rate">--</div>
-            </div>
-            <div class="metric-card accent-blue">
-              <div class="metric-label">Avg Closed PnL</div>
-              <div class="metric-value" id="perf-avg-pnl">--</div>
-            </div>
-          </div>
+  <!-- Header & Actions -->
+  <div class="section-header" style="margin-bottom: 20px;">
+    <div>
+      <div class="section-title" style="margin-bottom:4px;display:flex;align-items:center;gap:10px;">
+        <div class="section-dot" style="background:#60a5fa;box-shadow:0 0 10px rgba(96,165,250,0.5);"></div>
+        Solana RPC Infrastructure
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);">
+        Smart Dual-Routing: Free Public RPC for monitoring + Helius/Alchemy for execution to preserve free-tier credits
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button type="button" onclick="openAddRpcModal()" class="btn-primary btn-sm" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#7c5cff,#6366f1);border:none;cursor:pointer;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Tambah API Key / Node
+      </button>
+      <button type="button" id="btn-probe-rpc" onclick="probeRpcEndpoints()" class="btn-sm" style="display:flex;align-items:center;gap:6px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+        <svg id="icon-probe-rpc" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Tes Latensi &amp; Status RPC
+      </button>
+      <button type="button" onclick="loadRpcPage()" class="btn-ghost btn-sm" style="display:flex;align-items:center;gap:6px;border:1px solid var(--border-subtle);cursor:pointer;padding:7px 14px;border-radius:8px;font-size:12px;">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
 
-          <div class="lessons-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-            <!-- Lessons -->
-            <div>
-              <div class="section-header" style="margin-bottom:14px;">
-                <div class="section-title">
-                  <div class="section-dot"></div>
-                  Lessons Learned
-                </div>
-                <button onclick="document.getElementById('add-lesson-modal').showModal()" class="btn-primary btn-xs">Add Lesson</button>
-              </div>
-              <div id="lessons-list" style="display:flex;flex-direction:column;gap:10px;"></div>
-              <div class="pager" id="lessons-pager">
-                <span class="pager-info" id="lessons-pager-info"></span>
-                <div class="pager-controls">
-                  <button class="pager-btn" id="lessons-pager-prev" onclick="lessonsPage(-1)">← Prev</button>
-                  <span class="pager-page" id="lessons-pager-page"></span>
-                  <button class="pager-btn" id="lessons-pager-next" onclick="lessonsPage(1)">Next →</button>
-                </div>
-              </div>
-            </div>
-            <!-- Performance table -->
-            <div>
-              <div class="section-title" style="margin-bottom:14px;">
-                <div class="section-dot"></div>
-                Closed Positions Performance
-              </div>
-              <div class="panel" style="overflow:hidden;">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Pool</th>
-                      <th>Hold Time</th>
-                      <th>Close Reason</th>
-                      <th>PnL</th>
-                    </tr>
-                  </thead>
-                  <tbody id="lessons-perf-table-body"></tbody>
-                </table>
-              </div>
-              <div class="pager" id="perf-pager">
-                <span class="pager-info" id="perf-pager-info"></span>
-                <div class="pager-controls">
-                  <button class="pager-btn" id="perf-pager-prev" onclick="perfPage(-1)">← Prev</button>
-                  <span class="pager-page" id="perf-pager-page"></span>
-                  <button class="pager-btn" id="perf-pager-next" onclick="perfPage(1)">Next →</button>
-                </div>
-              </div>
-            </div>
-          </div>
+  <!-- Metric Summary Cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:20px;">
+    
+    <!-- Active Execution Node -->
+    <div class="metric-card accent-purple" style="position:relative;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="metric-label" style="margin-bottom:0;">Execution / Write RPC</div>
+        <span id="rpc-page-active-pulse" style="width:8px;height:8px;border-radius:50%;background:#a855f7;box-shadow:0 0 10px #a855f7;" class="pulse-dot"></span>
+      </div>
+      <div class="metric-value" id="rpc-page-active-name" style="font-size:17px;line-height:1.2;font-weight:700;">Helius (Primary)</div>
+      <div id="rpc-page-active-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Priority #1 &bull; Fallback: Alchemy</div>
+    </div>
+
+    <!-- Active Read / Monitor Node -->
+    <div class="metric-card accent-green">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="metric-label" style="margin-bottom:0;">Monitoring &amp; Read RPC</div>
+        <span style="width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80;" class="pulse-dot"></span>
+      </div>
+      <div class="metric-value" id="rpc-page-read-name" style="font-size:17px;line-height:1.2;font-weight:700;">Solana Public Mainnet</div>
+      <div style="font-size:11px;color:#4ade80;margin-top:4px;">100% Free RPC &bull; Zero Paid Credits</div>
+    </div>
+
+    <!-- Credit Saver Telemetry Card -->
+    <div class="metric-card accent-blue">
+      <div class="metric-label">Helius Credits Saved</div>
+      <div class="metric-value" id="rpc-page-saved-pct" style="font-size:22px;color:#60a5fa;">0%</div>
+      <div id="rpc-page-saved-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">0 Public Reads &bull; 0 Private Calls</div>
+    </div>
+
+    <!-- Latest Probe Latency Card -->
+    <div class="metric-card" style="background:var(--bg-surface);border:1px solid var(--border-subtle);">
+      <div class="metric-label">Latest Slot &amp; Ping</div>
+      <div class="metric-value" id="rpc-page-latency-val" style="font-size:20px;color:#60a5fa;">-- ms</div>
+      <div id="rpc-page-slot-val" style="font-size:11px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono';">Slot: --</div>
+    </div>
+  </div>
+
+  <!-- Smart Dual-Routing Architecture Banner -->
+  <div class="panel" style="padding:16px 20px;margin-bottom:24px;background:linear-gradient(135deg,rgba(30,41,59,0.7),rgba(15,23,42,0.85));border:1px solid rgba(96,165,250,0.25);border-radius:12px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;right:0;width:160px;height:160px;background:radial-gradient(circle,rgba(59,130,246,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid rgba(96,165,250,0.3);">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </span>
+        <div>
+          <span style="font-size:13px;font-weight:700;color:var(--text-primary);letter-spacing:0.02em;">Smart Dual-Routing Active</span>
+          <span style="margin-left:8px;font-size:10px;font-weight:700;background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:99px;">HELIUS FREE TIER PROTECTED</span>
         </div>
+      </div>
+      <div id="rpc-page-channel-status" style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:14px;font-family:'JetBrains Mono',monospace;">
+        <span>Failovers: <strong id="rpc-stats-failovers" style="color:#60a5fa;">0</strong></span>
+        <span>Reads: <strong id="rpc-stats-reads" style="color:#4ade80;">0</strong></span>
+        <span>Writes: <strong id="rpc-stats-writes" style="color:#c084fc;">0</strong></span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px;font-size:12px;color:var(--text-secondary);line-height:1.5;">
+      <div style="background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-weight:700;color:#4ade80;margin-bottom:2px;display:flex;align-items:center;gap:6px;">
+          <span>🌱</span> Channel Monitoring &amp; Balances (Polling 5s)
+        </div>
+        <div>
+          Dialihkan ke <strong>Solana Public Mainnet</strong> secara cuma-cuma. Jika terkena limit (429), otomatis fallback ke Helius / Alchemy tanpa mengganggu bot.
+        </div>
+      </div>
+      <div style="background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-weight:700;color:#c084fc;margin-bottom:2px;display:flex;align-items:center;gap:6px;">
+          <span>⚡</span> Channel Transaksi &amp; Eksekusi Kritis
+        </div>
+        <div>
+          Khusus <code>sendTransaction</code>, <code>simulate</code>, &amp; <code>blockhash</code> diarahkan strictly ke <strong>Helius (Primary)</strong> &rarr; fallback ke <strong>Alchemy</strong> (Public RPC di-exclude).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Endpoints Table Panel -->
+  <div class="section-header" style="margin-bottom:12px;">
+    <div class="section-title">
+      <div class="section-dot" style="background:#3b82f6;"></div>
+      RPC Endpoints &amp; Failover Priority
+    </div>
+    <span id="rpc-page-total-badge" style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:99px;background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);">-- Endpoints</span>
+  </div>
+
+  <div class="panel" style="overflow-x:auto;margin-bottom:24px;">
+    <table class="data-table" style="margin:0;width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="width:140px;padding:12px 16px;">Status</th>
+          <th style="padding:12px 16px;">Endpoint / Provider</th>
+          <th style="padding:12px 16px;width:170px;">Routing Role</th>
+          <th style="padding:12px 16px;">Masked RPC URL</th>
+          <th style="padding:12px 16px;width:105px;">Latency</th>
+          <th style="padding:12px 16px;min-width:180px;">Cooldown &amp; Catatan</th>
+          <th style="padding:12px 16px;width:75px;text-align:center;">Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="rpc-page-tbody">
+        <tr>
+          <td colspan="7" style="text-align:center;padding:36px;color:var(--text-muted);">Memuat status endpoint RPC...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Architecture & Guidelines Info Box -->
+  <div class="panel" style="padding:20px;background:rgba(20,24,35,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:14px;">
+    <div style="font-size:13px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <svg width="16" height="16" fill="none" stroke="#60a5fa" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Arsitektur Smart Dual-Routing &amp; Hemat Kuota Helius
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;font-size:12px;color:var(--text-secondary);line-height:1.6;">
+      <div>
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;">1. Pemisahan Trafik Baca vs Eksekusi</div>
+        Query polling rutin seperti cek saldo wallet, token accounts, dan PnL pooler memakai <code style="color:#4ade80;">Solana Public Mainnet</code> sehingga kredit Helius free tier tidak terbuang. Transaksi eksekusi tetap memakai Helius / Alchemy dengan latency terendah.
+      </div>
+      <div>
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;">2. Seamless Fallback &amp; Cooldown 60s</div>
+        Jika Solana Public Mainnet terkena limit (429) saat polling burst, koneksi seketika berpindah ke Helius / Alchemy secara otomatis tanpa jeda. Setelah 60 detik cooldown berakhir, bot kembali memakai Public Solana.
+      </div>
+      <div>
+        <div style="font-weight:600;color:var(--text-primary);margin-bottom:4px;">3. Multi-Node Eksekusi Transaksi</div>
+        Jika kuota Helius Primary habis saat eksekusi swap, order otomatis dialihkan ke Helius Backup Keys atau Alchemy Backup yang terdaftar di <code style="color:var(--accent-light);">.env</code>.
+      </div>
+    </div>
+  </div>
+
+</div>

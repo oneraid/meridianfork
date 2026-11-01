@@ -10,8 +10,8 @@
             </div>
           </div>
           <div class="panel" style="padding: 16px; margin-bottom: 24px;">
-            <div style="display: flex; gap: 10px; max-width: 600px;">
-              <input type="text" id="chk-filter-address" class="form-input" style="flex: 1; font-family: 'JetBrains Mono'; font-size: 13px;" placeholder="Masukkan CA Token atau Pool Address...">
+            <div style="display: flex; gap: 10px; max-width: 600px; flex-wrap: wrap;">
+              <input type="text" id="chk-filter-address" class="form-input" style="flex: 1; min-width: 200px; font-family: 'JetBrains Mono'; font-size: 13px;" placeholder="Masukkan CA Token atau Pool Address...">
               <button onclick="checkAddressFilters()" id="btn-check-filters" class="btn-primary" style="white-space: nowrap; height: 36px; padding: 0 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
                 <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right: 4px; display: inline-block; vertical-align: middle;"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 Cek Filter
@@ -49,8 +49,8 @@
           </div>
 
           <!-- Passed Candidates Panel -->
-          <div id="panel-cand-passed" class="panel" style="overflow:hidden; margin-bottom:32px;">
-            <table class="data-table">
+          <div id="panel-cand-passed" class="panel table-responsive" style="overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:32px;">
+            <table class="data-table" style="min-width:720px;">
               <thead>
                 <tr>
                   <th>Pool Details</th>
@@ -67,8 +67,8 @@
           </div>
 
           <!-- Filtered / Rejected Pools Panel -->
-          <div id="panel-cand-filtered" class="panel" style="overflow:hidden; margin-bottom:32px; display:none;">
-            <table class="data-table">
+          <div id="panel-cand-filtered" class="panel table-responsive" style="overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:32px; display:none;">
+            <table class="data-table" style="min-width:740px;">
               <thead>
                 <tr>
                   <th>Token / Pool Details</th>
@@ -90,17 +90,17 @@
                 <div class="section-dot"></div>
                 Agent Decision Log
               </div>
-              <div style="font-size:12px;color:var(--text-muted);">Structured audit trail of all agent operations</div>
+              <div style="font-size:12px;color:var(--text-muted);">Structured audit trail of all agent operations (geser tabel ke samping pada layar HP)</div>
             </div>
           </div>
-          <div class="panel" style="overflow:hidden; margin-bottom:8px;">
-            <table class="data-table">
+          <div id="panel-decisions-table" class="panel table-responsive" style="overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:8px;">
+            <table class="data-table" style="min-width:720px;">
               <thead>
                 <tr>
-                  <th>Timestamp</th>
-                  <th>Action Type</th>
-                  <th>Summary</th>
-                  <th>Decision / Reason</th>
+                  <th style="min-width:130px;">Timestamp</th>
+                  <th style="min-width:90px;">Action Type</th>
+                  <th style="min-width:180px;">Summary</th>
+                  <th style="min-width:320px;">Decision / Reason</th>
                 </tr>
               </thead>
               <tbody id="decisions-table-body"></tbody>
@@ -112,6 +112,30 @@
               <button class="pager-btn" id="decisions-pager-prev" onclick="decisionsPage(-1)">← Prev</button>
               <span class="pager-page" id="decisions-pager-page"></span>
               <button class="pager-btn" id="decisions-pager-next" onclick="decisionsPage(1)">Next →</button>
+            </div>
+          </div>
+
+          <!-- Lessons Learned -->
+          <div class="section-header" style="margin-top:36px;margin-bottom:14px;">
+            <div>
+              <div class="section-title" style="margin-bottom:4px;">
+                <div class="section-dot" style="background:var(--accent-light);"></div>
+                Lessons Learned
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);">Learned heuristics and strategy insights injected into agent context</div>
+            </div>
+            <button onclick="document.getElementById('add-lesson-modal').showModal()" class="btn-primary btn-xs" style="display:flex;align-items:center;gap:6px;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Add Lesson
+            </button>
+          </div>
+          <div id="lessons-list" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 380px), 1fr));gap:12px;margin-bottom:12px;"></div>
+          <div class="pager" id="lessons-pager" style="margin-bottom:32px;">
+            <span class="pager-info" id="lessons-pager-info"></span>
+            <div class="pager-controls">
+              <button class="pager-btn" id="lessons-pager-prev" onclick="lessonsPage(-1)">← Prev</button>
+              <span class="pager-page" id="lessons-pager-page"></span>
+              <button class="pager-btn" id="lessons-pager-next" onclick="lessonsPage(1)">Next →</button>
             </div>
           </div>
         </div>

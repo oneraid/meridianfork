@@ -453,6 +453,8 @@ export async function deployPosition({
   bins_above,
   downside_pct,
   upside_pct,
+  allow_narrow_range = false,
+  bypass_cooldown = false,
   // optional pool metadata for learning (passed by agent when available)
   pool_name,
   bin_step,
@@ -466,6 +468,10 @@ export async function deployPosition({
   entry_tvl,
   entry_volume,
   entry_holders,
+  // optional context for telegram / activity logging
+  reason,
+  target_wallet_name,
+  target_priority,
 }) {
   pool_address = normalizeMint(pool_address);
   const activeStrategy = strategy || config.strategy.strategy;
@@ -478,7 +484,7 @@ export async function deployPosition({
     throw new Error(`Invalid volatility ${volatility} — refusing deploy because the volatility feed is unusable.`);
   }
 
-  if (isPoolOnCooldown(pool_address)) {
+  if (!bypass_cooldown && isPoolOnCooldown(pool_address)) {
     log("deploy", `Pool ${pool_address.slice(0, 8)} is on cooldown — skipping`);
     return { success: false, error: "Pool on cooldown — was recently closed with a cooldown reason. Try a different pool." };
   }
@@ -486,7 +492,7 @@ export async function deployPosition({
   const { StrategyType, getBinIdFromPrice, getPriceOfBinByBinId } = await getDLMM();
   const pool = await getPool(pool_address);
   const baseMint = pool.lbPair.tokenXMint.toString();
-  if (isBaseMintOnCooldown(baseMint)) {
+  if (!bypass_cooldown && isBaseMintOnCooldown(baseMint)) {
     log("deploy", `Base mint ${baseMint.slice(0, 8)} is on cooldown — skipping deploy for pool ${pool_address.slice(0, 8)}`);
     return { success: false, error: "Token on cooldown — recently closed out-of-range too many times. Try a different token." };
   }
@@ -514,13 +520,16 @@ export async function deployPosition({
     activeBinsAbove = Math.max(0, upperBinId - activeBin.binId);
   }
 
+  const normalizedStrategy = String(activeStrategy || "").toLowerCase().replace(/[\s-]+/g, "_");
   const strategyMap = {
     spot: StrategyType.Spot,
     curve: StrategyType.Curve,
     bid_ask: StrategyType.BidAsk,
+    bidask: StrategyType.BidAsk,
+    ba: StrategyType.BidAsk,
   };
 
-  const strategyType = strategyMap[activeStrategy];
+  const strategyType = strategyMap[normalizedStrategy] ?? strategyMap[activeStrategy];
   if (strategyType === undefined) {
     throw new Error(`Invalid strategy: ${activeStrategy}. Use spot, curve, or bid_ask.`);
   }
@@ -544,9 +553,14 @@ export async function deployPosition({
   }
   const isSingleSidedSol = finalAmountX <= 0 && finalAmountY > 0;
   if (isSingleSidedSol && (Number(bins_above ?? 0) > 0 || Number(upside_pct ?? 0) > 0)) {
-    throw new Error(
-      "Single-side SOL deploy cannot use bins_above or upside_pct. Use amount_y with bins_below only; the upper bin is the SDK active bin.",
-    );
+    if (allow_narrow_range) {
+      activeBinsBelow = Number(activeBinsBelow ?? 0) + Number(bins_above ?? 0);
+      activeBinsAbove = 0;
+    } else {
+      throw new Error(
+        "Single-side SOL deploy cannot use bins_above or upside_pct. Use amount_y with bins_below only; the upper bin is the SDK active bin.",
+      );
+    }
   }
   if (isSingleSidedSol) {
     activeBinsAbove = 0;
@@ -562,7 +576,9 @@ export async function deployPosition({
   if (!Number.isInteger(activeBinsBelow) || !Number.isInteger(activeBinsAbove)) {
     throw new Error("Invalid bin range: bins_below and bins_above must be whole-bin integers.");
   }
-  const minBinsBelow = Math.max(MIN_SAFE_BINS_BELOW, Number(config.strategy.minBinsBelow ?? MIN_SAFE_BINS_BELOW));
+  const minBinsBelow = allow_narrow_range
+    ? 5
+    : Math.max(MIN_SAFE_BINS_BELOW, Number(config.strategy.minBinsBelow ?? MIN_SAFE_BINS_BELOW));
   const totalBins = activeBinsBelow + activeBinsAbove;
   if (totalBins < minBinsBelow) {
     throw new Error(
@@ -894,6 +910,29 @@ export async function deployPosition({
       },
     });
 
+    // Send Position Open Card to Telegram
+    import("../position-card.js").then(({ sendOpenPositionCard }) => {
+      sendOpenPositionCard({
+        pool: pool_address,
+        pool_name: pool_name || null,
+        pair: pool_name || null,
+        amount_sol: finalAmountY,
+        bin_step: actualBinStep,
+        bin_range: { min: minBinId, max: maxBinId, bins_below: activeBinsBelow, bins_above: activeBinsAbove },
+        strategy: activeStrategy,
+        position: newPosition.publicKey.toString(),
+        entry_mcap,
+        total_bins: (activeBinsBelow || 0) + (activeBinsAbove || 0),
+        fee_pct: actualBaseFee,
+        deployed_at: new Date().toISOString(),
+        tx: txHashes[0],
+        price_range: { min: minPrice, max: maxPrice },
+        reason: reason || "Position Opened",
+        target_wallet_name: target_wallet_name || null,
+        target_priority: target_priority != null ? target_priority : null,
+      }).catch(() => {});
+    }).catch(() => {});
+
     return {
       success: true,
       position: newPosition.publicKey.toString(),
@@ -1151,6 +1190,39 @@ async function fetchRawOpenPositionsFromMeridian({ walletAddress, agentId }) {
   };
 }
 
+async function backfillClosedPositionsFromMeteora(newlyClosed, walletAddress) {
+  if (!newlyClosed || newlyClosed.length === 0 || !walletAddress) return;
+  for (const pos of newlyClosed) {
+    if (!pos?.pool || !pos?.position) continue;
+    (async () => {
+      try {
+        const closedUrl = `https://dlmm.datapi.meteora.ag/positions/${pos.pool}/pnl?user=${walletAddress}&status=closed&pageSize=50&page=1`;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 5000));
+          const res = await fetch(closedUrl).catch(() => null);
+          if (!res || !res.ok) continue;
+          const data = await res.json().catch(() => null);
+          const entry = (data?.positions || []).find((p) => p.positionAddress === pos.position);
+          if (entry) {
+            const pnlUsd = safeNum(entry.pnlUsd);
+            const pnlSol = safeNum(entry.pnlSol);
+            const pnlPct = safeNum(entry.pnlPctChange);
+            const feesUsd = safeNum(entry.allTimeFees?.total?.usd);
+            updateClosedPnL(pos.position, pnlPct, pnlUsd, feesUsd, {
+              close_pnl_sol: pnlSol,
+              close_reason: "Manual zap-out on Meteora",
+            });
+            log("state", `Backfilled closed position ${pos.position.slice(0, 8)} from Meteora: ${pnlPct}% ($${pnlUsd}), fees: $${feesUsd}`);
+            break;
+          }
+        }
+      } catch (err) {
+        log("state_warn", `Failed to backfill ${pos.position.slice(0, 8)} from Meteora: ${err.message}`);
+      }
+    })();
+  }
+}
+
 // ─── Get My Positions ──────────────────────────────────────────
 export async function getMyPositions({ force = false, silent = false, wallet_address = null } = {}) {
   let walletOverride = null;
@@ -1182,7 +1254,10 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
         if (!silent) log("positions", `Computing PnL from RPC (${config.pnl.rpcUrl})...`);
         const rpcResult = await computePositions(walletAddress);
         if (useLocalWallet) {
-          syncOpenPositions(rpcResult.positions.map((p) => p.position));
+          const newlyClosed = syncOpenPositions(rpcResult.positions.map((p) => p.position));
+          if (newlyClosed && newlyClosed.length > 0) {
+            backfillClosedPositionsFromMeteora(newlyClosed, walletAddress);
+          }
           _positionsCache = rpcResult;
           _positionsCacheAt = Date.now();
         }
@@ -1410,7 +1485,10 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
       source: "meteora",
     };
     if (useLocalWallet) {
-      syncOpenPositions(activePositions.map(p => p.position));
+      const newlyClosed = syncOpenPositions(activePositions.map(p => p.position));
+      if (newlyClosed && newlyClosed.length > 0) {
+        backfillClosedPositionsFromMeteora(newlyClosed, walletAddress);
+      }
       _positionsCache = result;
       _positionsCacheAt = Date.now();
     }
@@ -1557,11 +1635,21 @@ export async function claimFees({ position_address }) {
       const txHash = await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
       txHashes.push(txHash);
     }
-    log("claim", `SUCCESS txs: ${txHashes.join(", ")}`);
-    _positionsCacheAt = 0; // invalidate cache after claim
-    recordClaim(position_address);
+    const tokenXMint = pool.lbPair.tokenXMint.toString();
+    const tokenYMint = pool.lbPair.tokenYMint.toString();
+    const solMint = config.tokens.SOL || "So11111111111111111111111111111111111111112";
+    const baseMint = (tokenXMint === solMint || tokenXMint === "SOL") ? tokenYMint : tokenXMint;
+    const tokensToSwap = [tokenXMint, tokenYMint].filter(m => m !== solMint && m !== "SOL");
 
-    return { success: true, position: position_address, txs: txHashes, base_mint: pool.lbPair.tokenXMint.toString() };
+    return {
+      success: true,
+      position: position_address,
+      txs: txHashes,
+      base_mint: baseMint,
+      token_x_mint: tokenXMint,
+      token_y_mint: tokenYMint,
+      tokens_to_swap: tokensToSwap,
+    };
   } catch (error) {
     log("claim_error", error.message);
     return { success: false, error: error.message };
@@ -1597,8 +1685,8 @@ export async function closePosition({ position_address, reason }) {
       const livePositions = await getMyPositions({ force: true, silent: true });
       const livePosition = livePositions?.positions?.find((position) => position.position === position_address);
       const closeFromBinId = livePosition?.lower_bin ?? tracked?.bin_range?.min ?? -887272;
-      const closeToBinId = livePosition?.upper_bin ?? tracked?.bin_range?.max ?? 887272;
-      const closeOutput = "allToken1";
+      const isToken0Sol = pool.lbPair.tokenXMint.toString() === config.tokens.SOL || pool.lbPair.tokenXMint.toString() === "So11111111111111111111111111111111111111112";
+      const closeOutput = isToken0Sol ? "allToken0" : "allToken1";
 
       const order = await agentMeridianJson("/execution/zap-out/order", {
         method: "POST",
@@ -1685,7 +1773,14 @@ export async function closePosition({ position_address, reason }) {
         };
       }
 
-      const closeBaseMint = livePosition?.base_mint || pool.lbPair.tokenXMint.toString();
+      const tokenXMint = pool.lbPair.tokenXMint.toString();
+      const tokenYMint = pool.lbPair.tokenYMint.toString();
+      const solMint = config.tokens.SOL || "So11111111111111111111111111111111111111112";
+      const nonSolBaseMint = (tokenXMint === solMint || tokenXMint === "SOL") ? tokenYMint : tokenXMint;
+      const closeBaseMint = livePosition?.base_mint && livePosition.base_mint !== solMint && livePosition.base_mint !== "SOL"
+        ? livePosition.base_mint
+        : nonSolBaseMint;
+      const tokensToSwap = [tokenXMint, tokenYMint].filter((m) => m !== solMint && m !== "SOL");
       const resolvedPoolName = tracked?.pool_name || poolMeta?.name || livePosition?.pair || poolAddress.slice(0, 8);
       recordClose(position_address, reason || "agent decision", {
         pool: poolAddress,
@@ -1810,6 +1905,30 @@ export async function closePosition({ position_address, reason }) {
           },
         });
 
+        // Send Position Recap Card to Telegram
+        import("../position-card.js").then(({ sendCloseRecapCard }) => {
+          sendCloseRecapCard({
+            pool: poolAddress,
+            pool_name: effectiveTracked.pool_name || poolMeta?.name,
+            pair: effectiveTracked.pool_name || poolMeta?.name,
+            amount_sol: effectiveTracked.amount_sol,
+            bin_step: effectiveTracked.bin_step,
+            bin_range: effectiveTracked.bin_range,
+            active_bin_at_deploy: effectiveTracked.active_bin_at_deploy,
+            strategy: effectiveTracked.strategy,
+            position: position_address,
+            entry_mcap: effectiveTracked.entry_mcap,
+            exit_mcap: exitMarket?.exit_mcap,
+            total_bins: effectiveTracked.bin_range ? (effectiveTracked.bin_range.bins_below || 60) : 60,
+            fee_pct: poolMeta?.fee_pct,
+            close_pnl_pct: pnlPct,
+            close_pnl_usd: pnlUsd,
+            deployed_at: effectiveTracked.deployed_at,
+            closed_at: new Date().toISOString(),
+            close_reason: reason || "Position Closed",
+          }).catch(() => {});
+        }).catch(() => {});
+
         return {
           success: true,
           relay: true,
@@ -1828,6 +1947,9 @@ export async function closePosition({ position_address, reason }) {
           fee_per_tvl_24h: lastKnownYield,
           minutes_held: minutesHeld,
           base_mint: closeBaseMint,
+          token_x_mint: tokenXMint,
+          token_y_mint: tokenYMint,
+          tokens_to_swap: tokensToSwap,
         };
       } catch (relayError) {
         if (relaySubmitted) throw relayError;
@@ -1896,7 +2018,23 @@ export async function closePosition({ position_address, reason }) {
       });
 
       for (const tx of Array.isArray(closeTx) ? closeTx : [closeTx]) {
-        const txHash = await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
+        let txHash;
+        try {
+          txHash = await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
+        } catch (sendErr) {
+          if (sendErr.message?.includes("Blockhash not found")) {
+            log("close_warn", `Blockhash not found on removeLiquidity tx — refreshing recent blockhash and retrying...`);
+            const latest = await getConnection().getLatestBlockhash("confirmed");
+            if (tx.recentBlockhash !== undefined) {
+              tx.recentBlockhash = latest.blockhash;
+            } else if (tx.message?.recentBlockhash !== undefined) {
+              tx.message.recentBlockhash = latest.blockhash;
+            }
+            txHash = await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
+          } else {
+            throw sendErr;
+          }
+        }
         closeTxHashes.push(txHash);
       }
     } else {
@@ -1905,7 +2043,23 @@ export async function closePosition({ position_address, reason }) {
         owner: wallet.publicKey,
         position: { publicKey: positionPubKey },
       });
-      const txHash = await sendAndConfirmTransaction(getConnection(), closeTx, [wallet]);
+      let txHash;
+      try {
+        txHash = await sendAndConfirmTransaction(getConnection(), closeTx, [wallet]);
+      } catch (sendErr) {
+        if (sendErr.message?.includes("Blockhash not found")) {
+          log("close_warn", `Blockhash not found on closePosition tx — refreshing recent blockhash and retrying...`);
+          const latest = await getConnection().getLatestBlockhash("confirmed");
+          if (closeTx.recentBlockhash !== undefined) {
+            closeTx.recentBlockhash = latest.blockhash;
+          } else if (closeTx.message?.recentBlockhash !== undefined) {
+            closeTx.message.recentBlockhash = latest.blockhash;
+          }
+          txHash = await sendAndConfirmTransaction(getConnection(), closeTx, [wallet]);
+        } else {
+          throw sendErr;
+        }
+      }
       closeTxHashes.push(txHash);
     }
     const txHashes = [...claimTxHashes, ...closeTxHashes];
@@ -1944,7 +2098,14 @@ export async function closePosition({ position_address, reason }) {
       };
     }
 
-    const closeBaseMint = pool.lbPair.tokenXMint.toString();
+    const tokenXMint = pool.lbPair.tokenXMint.toString();
+    const tokenYMint = pool.lbPair.tokenYMint.toString();
+    const solMint = config.tokens.SOL || "So11111111111111111111111111111111111111112";
+    const nonSolBaseMint = (tokenXMint === solMint || tokenXMint === "SOL") ? tokenYMint : tokenXMint;
+    const closeBaseMint = tracked?.base_mint && tracked.base_mint !== solMint && tracked.base_mint !== "SOL"
+      ? tracked.base_mint
+      : nonSolBaseMint;
+    const tokensToSwap = [tokenXMint, tokenYMint].filter((m) => m !== solMint && m !== "SOL");
     const resolvedPoolName = tracked?.pool_name || poolMeta?.name || poolAddress.slice(0, 8);
     recordClose(position_address, reason || "agent decision", {
       pool: poolAddress,
@@ -2116,6 +2277,30 @@ export async function closePosition({ position_address, reason }) {
         },
       });
 
+    // Send Position Recap Card to Telegram
+    import("../position-card.js").then(({ sendCloseRecapCard }) => {
+      sendCloseRecapCard({
+        pool: poolAddress,
+        pool_name: effectiveTracked.pool_name || poolMeta?.name,
+        pair: effectiveTracked.pool_name || poolMeta?.name,
+        amount_sol: effectiveTracked.amount_sol,
+        bin_step: effectiveTracked.bin_step,
+        bin_range: effectiveTracked.bin_range,
+        active_bin_at_deploy: effectiveTracked.active_bin_at_deploy,
+        strategy: effectiveTracked.strategy,
+        position: position_address,
+        entry_mcap: effectiveTracked.entry_mcap,
+        exit_mcap: exitMarket?.exit_mcap,
+        total_bins: effectiveTracked.bin_range ? (effectiveTracked.bin_range.bins_below || 60) : 60,
+        fee_pct: poolMeta?.fee_pct,
+        close_pnl_pct: pnlPct,
+        close_pnl_usd: pnlUsd,
+        deployed_at: effectiveTracked.deployed_at,
+        closed_at: new Date().toISOString(),
+        close_reason: reason || "Position Closed",
+      }).catch(() => {});
+    }).catch(() => {});
+
     return {
       success: true,
       position: position_address,
@@ -2132,6 +2317,9 @@ export async function closePosition({ position_address, reason }) {
       fee_per_tvl_24h: lastKnownYield,
       minutes_held: minutesHeld,
       base_mint: closeBaseMint,
+      token_x_mint: tokenXMint,
+      token_y_mint: tokenYMint,
+      tokens_to_swap: tokensToSwap,
     };
   } catch (error) {
     log("close_error", error.message);

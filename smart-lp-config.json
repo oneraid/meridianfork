@@ -1,0 +1,57 @@
+{
+  "enabled": true,
+  "mode": "copy",
+  "active_copy_wallet": "HCPdfZPr68KDVoaU7Q4EoxdqddSw8yjijUHt2kwfVEDP",
+  "wallets": [
+    {
+      "address": "E7Mn5EamiPmx9v5cgoWUu38m8aybjTRFfDdCMDME8PUa",
+      "name": "Wallet 1",
+      "enabled": true,
+      "copy_enabled": true,
+      "copy_priority": 1,
+      "copy_strategy": "spot",
+      "addedAt": "2026-10-19T08:15:21.573Z"
+    },
+    {
+      "address": "GAgLMuwFatGw2LdeoZEJECgGTN2h8Wn5nF7EdiDawRXC",
+      "name": "wallet 3",
+      "enabled": true,
+      "copy_enabled": false,
+      "copy_priority": 2,
+      "copy_strategy": "bid_ask",
+      "addedAt": "2026-10-19T11:41:28.135Z"
+    },
+    {
+      "address": "HCPdfZPr68KDVoaU7Q4EoxdqddSw8yjijUHt2kwfVEDP",
+      "name": "wallet 4",
+      "enabled": true,
+      "addedAt": "2026-10-21T23:54:05.245Z",
+      "copy_enabled": true,
+      "copy_priority": 0,
+      "copy_strategy": "spot"
+    },
+    {
+      "address": "2eh4AsysSUdr6CuRyM9Bm2eMrtqV1Gp6PKV9XDoyFQBw",
+      "name": "wallet 5",
+      "enabled": true,
+      "copy_strategy": "spot",
+      "addedAt": "2026-10-27T07:33:15.442Z",
+      "copy_enabled": true,
+      "copy_priority": 2
+    }
+  ],
+  "poll_interval_sec": 30,
+  "copy_settings": {
+    "max_sol_per_position": 0.3,
+    "gas_reserve": 0.02,
+    "max_active_positions": 1,
+    "slippage_bps": 100,
+    "auto_stop_loss_pct": 15,
+    "auto_take_profit_pct": 4,
+    "auto_close_on_target_exit": true,
+    "priority_fallback_minutes": 0
+  },
+  "last_poll": "2026-11-01T00:35:39.826Z",
+  "target_wallet": "E7Mn5EamiPmx9v5cgoWUu38m8aybjTRFfDdCMDME8PUa",
+  "target_name": "Wallet 1"
+}

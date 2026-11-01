@@ -573,19 +573,19 @@ function renderFilteredCandidates(filteredPools) {
 
       slice.forEach((d) => {
         const tr = document.createElement("tr");
-        const tdTime = document.createElement("td"); tdTime.style.cssText = "font-family:'JetBrains Mono';font-size:11px;color:var(--text-muted);";
+        const tdTime = document.createElement("td"); tdTime.style.cssText = "font-family:'JetBrains Mono';font-size:11px;color:var(--text-muted);white-space:nowrap;";
         tdTime.textContent = (d.ts || d.timestamp) ? new Date(d.ts || d.timestamp).toLocaleString() : "--"; tr.appendChild(tdTime);
         const tdBadge = document.createElement("td");
         const badge = document.createElement("span");
-        badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;";
+        badge.style.cssText = "font-size:10px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.06em;white-space:nowrap;";
         const type = String(d.type).toLowerCase();
         if (type === "deploy") { badge.style.background = "rgba(16,217,160,0.12)"; badge.style.color = "var(--success)"; badge.style.border = "1px solid rgba(16,217,160,0.25)"; badge.textContent = "DEPLOY"; }
         else if (type === "close") { badge.style.background = "rgba(255,77,109,0.1)"; badge.style.color = "#ff6b8a"; badge.style.border = "1px solid rgba(255,77,109,0.25)"; badge.textContent = "CLOSE"; }
         else if (type === "skip")  { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-muted)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = "SKIP"; }
         else { badge.style.background = "rgba(100,80,255,0.08)"; badge.style.color = "var(--text-secondary)"; badge.style.border = "1px solid var(--border-subtle)"; badge.textContent = String(d.type).toUpperCase(); }
         tdBadge.appendChild(badge); tr.appendChild(tdBadge);
-        const tdSummary = document.createElement("td"); tdSummary.style.cssText = "font-weight:600;color:var(--text-primary);"; tdSummary.textContent = d.summary; tr.appendChild(tdSummary);
-        const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;max-width:320px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
+        const tdSummary = document.createElement("td"); tdSummary.style.cssText = "font-weight:600;color:var(--text-primary);min-width:160px;"; tdSummary.textContent = d.summary; tr.appendChild(tdSummary);
+        const tdReason  = document.createElement("td"); tdReason.style.cssText  = "color:var(--text-secondary);font-size:12px;min-width:280px;white-space:normal;line-height:1.5;"; tdReason.textContent  = d.reason; tr.appendChild(tdReason);
         tbody.appendChild(tr);
       });
     }

@@ -476,15 +476,38 @@ export function setLastBriefingDate() {
  * Marks any local open positions as closed if they are not in the on-chain list.
  */
 const SYNC_GRACE_MS = 5 * 60_000; // don't auto-close positions deployed < 5 min ago
+const SYNC_MISSING_CONFIRM_TICKS = 3; // require 3 consecutive polls missing from on-chain before auto-closing
 
 export function syncOpenPositions(active_addresses) {
   const state = load();
   const activeSet = new Set(active_addresses);
   let changed = false;
+  const newlyClosed = [];
 
   for (const posId in state.positions) {
     const pos = state.positions[posId];
-    if (pos.closed || activeSet.has(posId)) continue;
+
+    // Resurrection: if a position was falsely auto-closed during a transient glitch, restore it
+    if (pos.closed) {
+      if (activeSet.has(posId) && (pos.close_reason?.includes("state sync") || pos.notes?.some((n) => n.includes("state sync")))) {
+        pos.closed = false;
+        pos.closed_at = null;
+        pos.close_reason = null;
+        pos.missing_sync_count = 0;
+        pos.notes.push(`Resurrected at ${new Date().toISOString()}: detected active on-chain again`);
+        changed = true;
+        log("state", `Position ${posId} resurrected — found active on-chain again`);
+      }
+      continue;
+    }
+
+    if (activeSet.has(posId)) {
+      if (pos.missing_sync_count) {
+        pos.missing_sync_count = 0;
+        changed = true;
+      }
+      continue;
+    }
 
     // Grace period: newly deployed positions may not be indexed yet
     const deployedAt = pos.deployed_at ? new Date(pos.deployed_at).getTime() : 0;
@@ -493,20 +516,32 @@ export function syncOpenPositions(active_addresses) {
       continue;
     }
 
+    // Require consecutive missing polls to prevent transient RPC / network glitches from auto-closing
+    pos.missing_sync_count = (pos.missing_sync_count || 0) + 1;
+    if (pos.missing_sync_count < SYNC_MISSING_CONFIRM_TICKS) {
+      log("state", `Position ${posId} missing from on-chain poll (${pos.missing_sync_count}/${SYNC_MISSING_CONFIRM_TICKS}), pending confirmation...`);
+      changed = true;
+      continue;
+    }
+
     pos.closed = true;
     pos.closed_at = new Date().toISOString();
-    pos.notes.push(`Auto-closed during state sync (not found on-chain)`);
+    pos.close_reason = "Closed on Meteora (Zap-out / Manual)";
+    pos.notes.push(`Auto-closed during state sync (not found on-chain after ${pos.missing_sync_count} checks)`);
+    pos.missing_sync_count = 0;
     changed = true;
+    newlyClosed.push({ ...pos });
     log("state", `Position ${posId} auto-closed (missing from on-chain data)`);
   }
 
   if (changed) save(state);
+  return newlyClosed;
 }
 
 /**
  * Update final PnL for a closed position.
  */
-export function updateClosedPnL(position_address, pnl_pct, pnl_usd, fees_usd) {
+export function updateClosedPnL(position_address, pnl_pct, pnl_usd, fees_usd, meta = {}) {
   const state = load();
   let pos = state.positions[position_address];
   if (!pos) {
@@ -520,7 +555,9 @@ export function updateClosedPnL(position_address, pnl_pct, pnl_usd, fees_usd) {
   }
   if (pnl_pct !== null && pnl_pct !== undefined) pos.close_pnl_pct = pnl_pct;
   if (pnl_usd !== null && pnl_usd !== undefined) pos.close_pnl_usd = pnl_usd;
+  if (meta?.close_pnl_sol !== null && meta?.close_pnl_sol !== undefined) pos.close_pnl_sol = meta.close_pnl_sol;
   if (fees_usd !== null && fees_usd !== undefined) pos.total_fees_claimed_usd = fees_usd;
+  if (meta?.close_reason) pos.close_reason = meta.close_reason;
   save(state);
   log("state", `Position ${position_address} final PnL updated: ${pnl_pct}% ($${pnl_usd}), fees: $${fees_usd}`);
 }

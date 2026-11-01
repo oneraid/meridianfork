@@ -34,6 +34,7 @@ import { stageSignals } from "./signal-tracker.js";
 import { getWeightsSummary } from "./signal-weights.js";
 import { bootstrapHiveMind, ensureAgentId, getHiveMindPullMode, isHiveMindEnabled, pullHiveMindLessons, pullHiveMindPresets, registerHiveMindAgent, startHiveMindBackgroundSync } from "./hivemind.js";
 import { appendDecision } from "./decision-log.js";
+import { getSmartLpExitSignal } from "./smart-lp.js";
 
 import { REPO_ROOT, repoPath } from "./repo-root.js";
 import { startDashboardServer } from "./server.js";
@@ -466,6 +467,20 @@ export async function runScreeningCycle({ silent = false } = {}) {
   let liveMessage = null;
   let screenReport = null;
   try {
+    const { isSmartLpCopyActive } = await import("./smart-lp.js").catch(() => ({ isSmartLpCopyActive: () => false }));
+    if (isSmartLpCopyActive()) {
+      log("cron", "Screening skipped — Smart LP Copy Mode is active (following target wallet instead)");
+      screenReport = "Screening skipped — Smart LP Copy Mode is active (following target wallet).";
+      appendDecision({
+        type: "skip",
+        actor: "SCREENER",
+        summary: "Screening bypassed",
+        reason: "Smart LP Copy Mode is active (relying on target wallet logic)",
+      });
+      _screeningBusy = false;
+      return screenReport;
+    }
+
     [prePositions, preBalance] = await Promise.all([getMyPositions({ force: true }), getWalletBalances()]);
     if (prePositions.total_positions >= config.risk.maxPositions) {
       log("cron", `Screening skipped — max positions reached (${prePositions.total_positions}/${config.risk.maxPositions})`);
@@ -660,14 +675,23 @@ export async function runScreeningCycle({ silent = false } = {}) {
         ? `  pvp: HIGH — rival ${pool.pvp_rival_name || pool.pvp_symbol} (${pool.pvp_rival_mint?.slice(0, 8)}...) has pool ${pool.pvp_rival_pool?.slice(0, 8)}..., tvl=$${pool.pvp_rival_tvl}, holders=${pool.pvp_rival_holders}, fees=${pool.pvp_rival_fees}SOL`
         : null;
 
+      const degen = Number(degenScore(pool, config.opportunity) || 0).toFixed(1);
+      const indicatorLine = pool.indicator_confirmation
+        ? `  indicator: ${pool.indicator_confirmation.confirmed ? "CONFIRMED" : "REJECTED"}${pool.indicator_confirmation.reason ? ` (${pool.indicator_confirmation.reason})` : ""}`
+        : null;
+      const vol1h = ti?.stats_1h?.buy_vol != null && ti?.stats_1h?.sell_vol != null
+        ? `, buy_vol=$${ti.stats_1h.buy_vol}, sell_vol=$${ti.stats_1h.sell_vol}`
+        : "";
+
       const block = [
         `POOL: ${pool.name} (${pool.pool})`,
-        `  metrics: bin_step=${pool.bin_step}, fee_pct=${pool.fee_pct}%, fee_tvl=${pool.fee_active_tvl_ratio}, vol=$${pool.volume_window}, tvl=$${pool.tvl ?? pool.active_tvl}, volatility_${pool.volatility_timeframe || "30m"}=${pool.volatility}, mcap=$${pool.mcap}, organic=${pool.organic_score}${pool.token_age_hours != null ? `, age=${pool.token_age_hours}h` : ""}`,
+        `  metrics: bin_step=${pool.bin_step}, fee_pct=${pool.fee_pct}%, fee_tvl=${pool.fee_active_tvl_ratio}, degen=${degen}, vol=$${pool.volume_window}, tvl=$${pool.tvl ?? pool.active_tvl}, volatility_${pool.volatility_timeframe || "30m"}=${pool.volatility}, mcap=$${pool.mcap}, organic=${pool.organic_score}${pool.token_age_hours != null ? `, age=${pool.token_age_hours}h` : ""}`,
         `  audit: top10=${top10Pct}%, bots=${botPct}%, fees=${feesSol}SOL${launchpad ? `, launchpad=${launchpad}` : ""}`,
         pvpLine,
+        indicatorLine,
         `  smart_wallets: ${sw?.in_pool?.length ?? 0} present${sw?.in_pool?.length ? ` → CONFIDENCE BOOST (${sw.in_pool.map(w => w.name).join(", ")})` : ""}`,
         activeBin != null ? `  active_bin: ${activeBin}` : null,
-        priceChange != null ? `  1h: price${priceChange >= 0 ? "+" : ""}${priceChange}%, net_buyers=${netBuyers ?? "?"}` : null,
+        priceChange != null ? `  1h: price${priceChange >= 0 ? "+" : ""}${priceChange}%${vol1h}, net_buyers=${netBuyers ?? "?"}` : null,
         n?.narrative ? `  narrative_untrusted: ${sanitizeUntrustedPromptText(n.narrative, 500)}` : `  narrative_untrusted: none`,
         mem ? `  memory_untrusted: ${sanitizeUntrustedPromptText(mem, 500)}` : null,
       ].filter(Boolean).join("\n");
@@ -868,8 +892,9 @@ Summarize the current portfolio health, total fees earned, and performance of al
         if (exit) { signal = exit.action; reason = exit.reason; }
         else if (closeRule) { signal = `RULE_${closeRule.rule}`; reason = closeRule.reason; rule = closeRule.rule; }
 
-        // Require N consecutive confirming ticks before acting.
-        const { fire } = registerExitSignal(p.position, signal, confirmTicks);
+        // Require N consecutive confirming ticks before acting (1 tick for hard stop loss or Smart LP SL/TP).
+        const effectiveConfirmTicks = (closeRule?.rule?.startsWith?.("smart_lp") || signal === "STOP_LOSS") ? 1 : confirmTicks;
+        const { fire } = registerExitSignal(p.position, signal, effectiveConfirmTicks);
         if (!signal || !fire) continue;
 
         log("state", `[PnL poll] ${signal} confirmed (${confirmTicks} ticks): ${p.pair} — ${reason} — closing directly`);
@@ -1025,24 +1050,29 @@ function formatCandidates(candidates) {
 }
 
 function getDeterministicCloseRule(position, managementConfig) {
+  // ── Smart LP Copy Position SL/TP check (evaluated immediately, target wallet exit independent) ──
+  try {
+    const smartSignal = getSmartLpExitSignal(position.position, position.pnl_pct);
+    if (smartSignal) {
+      return smartSignal;
+    }
+  } catch (err) {
+    log("cron_warn", `Smart LP exit signal check error: ${err.message}`);
+  }
+
   const tracked = getTrackedPosition(position.position);
   const pnlSuspect = (() => {
-    // Couldn't-price-this-tick flag (e.g. Jupiter outage) — never act on PnL rules.
+    // Couldn't-price-this-tick flag (missing deposits/data outage) — never act on PnL rules.
     if (position.pnl_pct_suspicious) return true;
     if (position.pnl_pct == null) return false;
-    if (position.pnl_pct > -90) return false;
-    if (tracked?.amount_sol && (position.total_value_usd ?? 0) > 0.01) {
-      log("cron_warn", `Suspect PnL for ${position.pair}: ${position.pnl_pct}% but position still has value — skipping PnL rules`);
-      return true;
-    }
     return false;
   })();
 
   if (!pnlSuspect && position.pnl_pct != null && managementConfig.stopLossPct != null && position.pnl_pct <= managementConfig.stopLossPct) {
-    return { action: "CLOSE", rule: 1, reason: "stop loss" };
+    return { action: "CLOSE", rule: 1, reason: `stop loss: PnL ${position.pnl_pct}% <= ${managementConfig.stopLossPct}%` };
   }
   if (!pnlSuspect && position.pnl_pct != null && managementConfig.takeProfitPct != null && position.pnl_pct >= managementConfig.takeProfitPct) {
-    return { action: "CLOSE", rule: 2, reason: "take profit" };
+    return { action: "CLOSE", rule: 2, reason: `take profit: PnL ${position.pnl_pct}% >= ${managementConfig.takeProfitPct}%` };
   }
   if (
     position.active_bin != null &&
@@ -1714,11 +1744,12 @@ async function telegramHandler(msg) {
       if (idx < 0 || idx >= positions.length) { await sendMessage("Invalid number. Use /positions first."); return; }
       const pos = positions[idx];
       await sendMessage(`Closing ${pos.pair}...`);
-      const result = await closePosition({ position_address: pos.position });
+      const result = await executeTool("close_position", { position_address: pos.position, reason: "telegram close" });
       if (result.success) {
         const closeTxs = result.close_txs?.length ? result.close_txs : result.txs;
         const claimNote = result.claim_txs?.length ? `\nClaim txs: ${result.claim_txs.join(", ")}` : "";
-        await sendMessage(`✅ Closed ${pos.pair}\nPnL: ${config.management.solMode ? "◎" : "$"}${result.pnl_usd ?? "?"} | close txs: ${closeTxs?.join(", ") || "n/a"}${claimNote}`);
+        const autoSwapNote = result.auto_swapped ? `\nAuto-swapped base token → SOL` : "";
+        await sendMessage(`✅ Closed ${pos.pair}\nPnL: ${config.management.solMode ? "◎" : "$"}${result.pnl_usd ?? "?"} | close txs: ${closeTxs?.join(", ") || "n/a"}${claimNote}${autoSwapNote}`);
       } else {
         await sendMessage(`❌ Close failed: ${JSON.stringify(result)}`);
       }
@@ -1734,7 +1765,7 @@ async function telegramHandler(msg) {
       const results = [];
       for (const pos of positions) {
         try {
-          const result = await closePosition({ position_address: pos.position });
+          const result = await executeTool("close_position", { position_address: pos.position, reason: "telegram closeall" });
           results.push(`${pos.pair}: ${result.success ? "closed" : `failed (${result.error || "unknown"})`}`);
         } catch (error) {
           results.push(`${pos.pair}: failed (${error.message})`);
@@ -1743,6 +1774,23 @@ async function telegramHandler(msg) {
       await sendMessage(`Close-all finished.\n\n${results.join("\n")}`).catch(() => {});
     } catch (e) {
       await sendMessage(`Error: ${e.message}`).catch(() => {});
+    }
+    return;
+  }
+
+  if (text === "/zapout" || text === "/sweep") {
+    try {
+      await sendMessage("🧹 Scanning wallet and zapping out tokens to SOL...");
+      const { zapOutTokensToSol } = await import("./tools/executor.js");
+      const res = await zapOutTokensToSol({ sweepWallet: true, label: "telegram zapout" });
+      if (res.swapped) {
+        const details = res.swaps.map((s) => `• ${s.mint.slice(0, 8)}: +${s.sol_received.toFixed(4)} SOL`).join("\n");
+        await sendMessage(`✅ Zap-out completed! Received ~${res.total_sol_received.toFixed(4)} SOL:\n${details}`);
+      } else {
+        await sendMessage("ℹ️ No unswapped tokens found to zap out (wallet is clean or balances are dust).");
+      }
+    } catch (e) {
+      await sendMessage(`Error during zap-out: ${e.message}`).catch(() => {});
     }
     return;
   }

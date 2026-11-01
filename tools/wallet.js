@@ -11,6 +11,11 @@ import { config } from "../config.js";
 import { getConnection } from "./rpc.js";
 
 let _wallet = null;
+let _lastKnownSolPrice = 125;
+
+export function getLastKnownSolPrice() {
+  return _lastKnownSolPrice > 0 ? _lastKnownSolPrice : 95.75;
+}
 
 function getWallet() {
   if (!_wallet) {
@@ -20,6 +25,7 @@ function getWallet() {
   return _wallet;
 }
 
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 const JUPITER_PRICE_API = "https://api.jup.ag/price/v3";
 const JUPITER_SWAP_V2_API = "https://api.jup.ag/swap/v2";
 const DEFAULT_JUPITER_API_KEY = "b15d42e9-e0e4-4f90-a424-ae41ceeaa382";
@@ -54,27 +60,25 @@ async function getWalletBalancesFromRpc(walletAddress) {
     const balanceLamports = await connection.getBalance(pubkey);
     const solBalance = balanceLamports / LAMPORTS_PER_SOL;
 
-    // Get SOL price from Jupiter Price API
-    let solPrice = 0;
-    try {
-      const priceRes = await fetch("https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112", {
-        headers: getJupiterApiKey() ? { "x-api-key": getJupiterApiKey() } : {},
-      });
-      if (priceRes.ok) {
-        const priceData = await priceRes.json();
-        solPrice = Number(priceData?.data?.["So11111111111111111111111111111111111111112"]?.price || 0);
-      }
-    } catch {}
-
-    // Also get parsed token accounts (USDC and other SPL tokens)
+    // Get parsed token accounts (standard SPL Token and Token-2022)
     let usdcBalance = 0;
     const tokens = [];
     try {
-      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
-        programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-      });
+      const [tokenAccounts, token2022Accounts] = await Promise.all([
+        connection.getParsedTokenAccountsByOwner(pubkey, {
+          programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+        }).catch(() => ({ value: [] })),
+        connection.getParsedTokenAccountsByOwner(pubkey, {
+          programId: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+        }).catch(() => ({ value: [] })),
+      ]);
 
-      for (const item of tokenAccounts?.value || []) {
+      const allAccounts = [
+        ...(tokenAccounts?.value || []),
+        ...(token2022Accounts?.value || []),
+      ];
+
+      for (const item of allAccounts) {
         const info = item.account?.data?.parsed?.info;
         const mint = info?.mint;
         const amount = info?.tokenAmount?.uiAmount || 0;
@@ -94,8 +98,61 @@ async function getWalletBalancesFromRpc(walletAddress) {
       log("wallet_warn", `Failed to parse SPL token accounts: ${e.message}`);
     }
 
+    // Get SOL & token prices from Jupiter Price API
+    let solPrice = 0;
+    try {
+      const mintsToPrice = [
+        SOL_MINT,
+        ...tokens.filter((t) => t.mint !== config.tokens.USDC && t.mint !== SOL_MINT).map((t) => t.mint),
+      ];
+      const jupiterApiKey = getJupiterApiKey();
+      const priceRes = await fetch(`${JUPITER_PRICE_API}?ids=${mintsToPrice.slice(0, 50).join(",")}`, {
+        headers: jupiterApiKey ? { "x-api-key": jupiterApiKey } : {},
+      });
+      if (priceRes.ok) {
+        const priceData = await priceRes.json();
+        const getPrice = (entry) => Number(entry?.usdPrice ?? entry?.price ?? entry?.data?.price ?? 0);
+        const fetchedSolPrice = getPrice(priceData[SOL_MINT] || priceData.data?.[SOL_MINT]);
+        if (fetchedSolPrice > 0) {
+          solPrice = fetchedSolPrice;
+          _lastKnownSolPrice = solPrice;
+        }
+        for (const token of tokens) {
+          if (token.mint === config.tokens.USDC) continue;
+          const p = getPrice(priceData[token.mint] || priceData.data?.[token.mint]);
+          if (p > 0) {
+            token.usd = Math.round(token.balance * p * 100) / 100;
+          }
+        }
+      }
+    } catch (e) {
+      log("wallet_warn", `Failed to fetch prices from Jupiter: ${e.message}`);
+    }
+
+    if (!solPrice || solPrice <= 0) {
+      // Fallback 1: DexScreener
+      try {
+        const dsRes = await fetch("https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112", {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          const p = parseFloat(dsData?.pairs?.[0]?.priceUsd || 0);
+          if (p > 0) {
+            solPrice = p;
+            _lastKnownSolPrice = solPrice;
+          }
+        }
+      } catch {}
+      // Fallback 2: Cached last known price
+      if (!solPrice || solPrice <= 0) {
+        solPrice = _lastKnownSolPrice;
+      }
+    }
+
     const solUsd = solBalance * solPrice;
-    const totalUsd = solUsd + usdcBalance;
+    const tokensUsd = tokens.reduce((acc, t) => acc + (t.usd || 0), 0);
+    const totalUsd = solUsd + usdcBalance + tokensUsd;
 
     return {
       wallet: walletAddress,
@@ -129,6 +186,17 @@ export async function getWalletBalances() {
     return { wallet: null, sol: 0, sol_price: 0, sol_usd: 0, usdc: 0, tokens: [], total_usd: 0, error: "Wallet not configured" };
   }
 
+  // 1. Prioritize Free Solana Public RPC first to save 100% of Helius free-tier credits
+  try {
+    const rpcResult = await getWalletBalancesFromRpc(walletAddress);
+    if (rpcResult && rpcResult.wallet) {
+      return rpcResult;
+    }
+  } catch (rpcErr) {
+    log("wallet_warn", `Public RPC balance fetch failed (${rpcErr.message.slice(0, 80)}). Falling back to Helius/Alchemy...`);
+  }
+
+  // 2. Fallback to Helius REST API if Public Solana RPC is cooling down or failed
   // Track Helius key status to auto-skip exhausted or cooling-down keys
   if (!globalThis._heliusWalletKeyStatus) {
     globalThis._heliusWalletKeyStatus = new Map();
@@ -216,12 +284,10 @@ export async function getWalletBalances() {
 /**
  * Swap tokens via Jupiter Swap API V2 (order → sign → execute).
  */
-const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 // Normalize any SOL-like address to the correct wrapped SOL mint
 export function normalizeMint(mint) {
   if (!mint) return mint;
-  const SOL_MINT = "So11111111111111111111111111111111111111112";
   if (
     mint === "SOL" || 
     mint === "native" || 
@@ -233,10 +299,123 @@ export function normalizeMint(mint) {
   return mint;
 }
 
+export async function getOnChainTokenBalance(mint, walletAddress = null) {
+  const wallet = getWallet();
+  const pubkey = walletAddress ? new PublicKey(walletAddress) : wallet.publicKey;
+  const connection = getConnection();
+  const normalized = normalizeMint(mint);
+
+  if (normalized === config.tokens.SOL || normalized === SOL_MINT) {
+    const lamports = await connection.getBalance(pubkey);
+    return {
+      mint: config.tokens.SOL,
+      symbol: "SOL",
+      balance: lamports / LAMPORTS_PER_SOL,
+      raw_amount: lamports.toString(),
+      decimals: 9,
+      found: true,
+    };
+  }
+
+  const [tokenAccounts, token2022Accounts] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+    }).catch(() => ({ value: [] })),
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+    }).catch(() => ({ value: [] })),
+  ]);
+
+  const allAccounts = [
+    ...(tokenAccounts?.value || []),
+    ...(token2022Accounts?.value || []),
+  ];
+
+  let rawTotal = 0n;
+  let decimals = 9;
+  let uiTotal = 0;
+  let found = false;
+
+  for (const item of allAccounts) {
+    const info = item.account?.data?.parsed?.info;
+    if (info?.mint === normalized) {
+      found = true;
+      const raw = BigInt(info.tokenAmount?.amount || "0");
+      rawTotal += raw;
+      decimals = info.tokenAmount?.decimals ?? decimals;
+      uiTotal += Number(info.tokenAmount?.uiAmount || 0);
+    }
+  }
+
+  return {
+    mint: normalized,
+    balance: uiTotal,
+    raw_amount: rawTotal.toString(),
+    decimals,
+    found,
+  };
+}
+
+export async function getNonSolTokensWithBalance(walletAddress = null) {
+  const wallet = getWallet();
+  const pubkey = walletAddress ? new PublicKey(walletAddress) : wallet.publicKey;
+  const connection = getConnection();
+
+  const [tokenAccounts, token2022Accounts] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+    }).catch(() => ({ value: [] })),
+    connection.getParsedTokenAccountsByOwner(pubkey, {
+      programId: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+    }).catch(() => ({ value: [] })),
+  ]);
+
+  const allAccounts = [
+    ...(tokenAccounts?.value || []),
+    ...(token2022Accounts?.value || []),
+  ];
+
+  const tokenMap = new Map();
+
+  for (const item of allAccounts) {
+    const info = item.account?.data?.parsed?.info;
+    const mint = info?.mint;
+    if (!mint || mint === config.tokens.SOL || mint === SOL_MINT) continue;
+
+    const raw = BigInt(info.tokenAmount?.amount || "0");
+    const ui = Number(info.tokenAmount?.uiAmount || 0);
+    const decimals = info.tokenAmount?.decimals ?? 9;
+
+    if (raw > 0n && ui > 0) {
+      if (tokenMap.has(mint)) {
+        const existing = tokenMap.get(mint);
+        existing.rawTotal += raw;
+        existing.balance += ui;
+      } else {
+        tokenMap.set(mint, {
+          mint,
+          rawTotal: raw,
+          balance: ui,
+          decimals,
+        });
+      }
+    }
+  }
+
+  return Array.from(tokenMap.values()).map((t) => ({
+    mint: t.mint,
+    raw_amount: t.rawTotal.toString(),
+    balance: t.balance,
+    decimals: t.decimals,
+  }));
+}
+
 export async function swapToken({
   input_mint,
   output_mint,
   amount,
+  raw_amount,
+  slippage_bps,
 }) {
   input_mint  = normalizeMint(input_mint);
   output_mint = normalizeMint(output_mint);
@@ -244,23 +423,33 @@ export async function swapToken({
   if (process.env.DRY_RUN === "true") {
     return {
       dry_run: true,
-      would_swap: { input_mint, output_mint, amount },
+      would_swap: { input_mint, output_mint, amount, raw_amount, slippage_bps },
       message: "DRY RUN — no transaction sent",
     };
   }
 
   try {
-    log("swap", `${amount} of ${input_mint} → ${output_mint}`);
     const wallet = getWallet();
     const connection = getConnection();
 
     // ─── Convert to smallest unit ──────────────────────────────
-    let decimals = 9; // SOL default
-    if (input_mint !== config.tokens.SOL) {
-      const mintInfo = await connection.getParsedAccountInfo(new PublicKey(input_mint));
-      decimals = mintInfo.value?.data?.parsed?.info?.decimals ?? 9;
+    let amountStr;
+    if (raw_amount != null && String(raw_amount).trim() !== "" && String(raw_amount) !== "0") {
+      amountStr = String(raw_amount).trim();
+    } else {
+      let decimals = 9; // SOL default
+      if (input_mint !== config.tokens.SOL) {
+        const mintInfo = await connection.getParsedAccountInfo(new PublicKey(input_mint));
+        decimals = mintInfo.value?.data?.parsed?.info?.decimals ?? 9;
+      }
+      amountStr = Math.floor(amount * Math.pow(10, decimals)).toString();
     }
-    const amountStr = Math.floor(amount * Math.pow(10, decimals)).toString();
+
+    if (!amountStr || amountStr === "0") {
+      return { success: false, error: "Swap amount is zero" };
+    }
+
+    log("swap", `${amount ?? amountStr} of ${input_mint} → ${output_mint}`);
 
     // ─── Get Swap V2 order (unsigned tx + requestId) ───────────
     const search = new URLSearchParams({
@@ -269,6 +458,9 @@ export async function swapToken({
       amount: amountStr,
       taker: wallet.publicKey.toString(),
     });
+    if (slippage_bps != null && Number.isFinite(Number(slippage_bps))) {
+      search.set("slippageBps", String(Math.round(Number(slippage_bps))));
+    }
     const referralParams = getJupiterReferralParams();
     if (referralParams) {
       search.set("referralAccount", referralParams.referralAccount);

@@ -279,6 +279,83 @@ export function isBaseMintOnCooldown(baseMint) {
   );
 }
 
+/**
+ * List all active cooldowns.
+ * @returns {Array<{ pool: string, name: string, base_mint: string, pool_cooldown: object|null, token_cooldown: object|null }>}
+ */
+export function getActiveCooldowns() {
+  const db = load();
+  const now = new Date();
+  const list = [];
+  for (const [pool, entry] of Object.entries(db)) {
+    const isPoolCd = entry?.cooldown_until && new Date(entry.cooldown_until) > now;
+    const isTokenCd = entry?.base_mint_cooldown_until && new Date(entry.base_mint_cooldown_until) > now;
+    if (isPoolCd || isTokenCd) {
+      list.push({
+        pool,
+        name: entry.name || pool.slice(0, 8),
+        base_mint: entry.base_mint || null,
+        pool_cooldown: isPoolCd ? { until: entry.cooldown_until, reason: entry.cooldown_reason || null } : null,
+        token_cooldown: isTokenCd ? { until: entry.base_mint_cooldown_until, reason: entry.base_mint_cooldown_reason || null } : null,
+      });
+    }
+  }
+  return list;
+}
+
+/**
+ * Reset cooldown for a specific pool, token base mint, or all pools.
+ * @param {Object} [options]
+ * @param {string} [options.poolAddress]
+ * @param {string} [options.baseMint]
+ * @param {boolean} [options.all]
+ * @returns {{ clearedPools: number, clearedTokens: number, affectedNames: string[] }}
+ */
+export function resetCooldowns({ poolAddress, baseMint, all = false } = {}) {
+  const db = load();
+  let clearedPools = 0;
+  let clearedTokens = 0;
+  const affectedNames = new Set();
+  const targetPool = poolAddress ? String(poolAddress).trim().toLowerCase() : null;
+  const targetMint = baseMint ? String(baseMint).trim().toLowerCase() : null;
+  const clearAll = all || (!targetPool && !targetMint);
+
+  for (const [addr, entry] of Object.entries(db)) {
+    if (!entry) continue;
+    const entryName = (entry.name || "").toLowerCase();
+    const entryAddr = addr.toLowerCase();
+    const entryMint = (entry.base_mint || "").toLowerCase();
+
+    const matchedPool = clearAll || (targetPool && (entryAddr === targetPool || entryName === targetPool || entryName.startsWith(targetPool)));
+    const matchedToken = clearAll ||
+      (targetMint && (entryMint === targetMint || entryName === targetMint || entryName.startsWith(targetMint))) ||
+      (matchedPool && Boolean(targetPool));
+
+    if (matchedPool && entry.cooldown_until) {
+      delete entry.cooldown_until;
+      delete entry.cooldown_reason;
+      clearedPools++;
+      if (entry.name) affectedNames.add(entry.name);
+    }
+
+    if (matchedToken && entry.base_mint_cooldown_until) {
+      delete entry.base_mint_cooldown_until;
+      delete entry.base_mint_cooldown_reason;
+      clearedTokens++;
+      if (entry.name) affectedNames.add(entry.name);
+    }
+  }
+
+  save(db);
+  log("pool-memory", `Cooldowns reset: ${clearedPools} pool(s), ${clearedTokens} token(s)`);
+  return {
+    clearedPools,
+    clearedTokens,
+    affectedNames: Array.from(affectedNames),
+  };
+}
+
+
 // ─── Read ──────────────────────────────────────────────────────
 
 /**
@@ -381,7 +458,10 @@ export function recallForPool(poolAddress) {
 
   // Deploy history summary
   if (entry.total_deploys > 0) {
-    lines.push(`POOL MEMORY [${entry.name}]: ${entry.total_deploys} past deploy(s), avg PnL ${entry.avg_pnl_pct}%, win rate ${entry.win_rate}%, last outcome: ${entry.last_outcome}`);
+    const isPoolCd = entry.cooldown_until && new Date(entry.cooldown_until) > new Date();
+    const isTokenCd = entry.base_mint_cooldown_until && new Date(entry.base_mint_cooldown_until) > new Date();
+    const cdLabel = (!isPoolCd && !isTokenCd) ? " (cooldown expired / eligible for entry)" : "";
+    lines.push(`POOL MEMORY [${entry.name}]: ${entry.total_deploys} past deploy(s), avg PnL ${entry.avg_pnl_pct}%, win rate ${entry.win_rate}%, last outcome: ${entry.last_outcome}${cdLabel}`);
   }
 
   if (entry.cooldown_until && new Date(entry.cooldown_until) > new Date()) {

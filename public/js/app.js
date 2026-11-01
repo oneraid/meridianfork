@@ -28,51 +28,25 @@
       }
     });
 
-    // Logout
     function syncBottomNav(tabId) {
-      BNAV_TABS.forEach(t => {
+      const bnavTabs = ['dashboard', 'positions', 'smartlp', 'decisions', 'lessons', 'config'];
+      bnavTabs.forEach(t => {
         const btn = document.getElementById(`bnav-${t}`);
         if (btn) btn.classList.toggle('active', t === tabId);
       });
-      const moreBtn = document.getElementById('bnav-more');
-      if (moreBtn) moreBtn.classList.toggle('active', MORE_TABS.includes(tabId));
-      MORE_TABS.forEach(t => {
-        const item = document.getElementById(`more-btn-${t}`);
-        if (item) item.classList.toggle('active', t === tabId);
-      });
     }
 
-    function toggleMoreMenu() {
-      const menu = document.getElementById('more-menu');
-      const backdrop = document.getElementById('more-backdrop');
-      const isOpen = menu.classList.toggle('open');
-      backdrop.classList.toggle('open', isOpen);
-    }
+    function closeMobileMenu() {}
 
-    function closeMoreMenu() {
-      document.getElementById('more-menu').classList.remove('open');
-      document.getElementById('more-backdrop').classList.remove('open');
-    }
-
-    function closeMobileMenu() { closeMoreMenu(); }
-
-    function moreNav(tabId) {
-      switchTab(tabId);
-      closeMoreMenu();
-      window.scrollTo(0, 0);
-      const ca = document.getElementById('content-area');
-      if (ca) ca.scrollTop = 0;
-    }
-
-    // Patch switchTab to sync bottom nav active state
+    // Patch switchTab to sync bottom nav active state and scroll to top
     const _origSwitchTab = switchTab;
     switchTab = function(tabId) {
       _origSwitchTab(tabId);
       syncBottomNav(tabId);
+      window.scrollTo(0, 0);
+      const ca = document.getElementById('content-area');
+      if (ca) ca.scrollTop = 0;
     };
-
-    // Close more menu when tapping content area
-    document.getElementById('content-area').addEventListener('touchstart', closeMoreMenu, { passive: true });
 
     // Check active session on load
     checkSession();

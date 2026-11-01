@@ -54,6 +54,11 @@
                   </button>
                 </div>
                 <button type="button" onclick="goToTodayPnlMonth()" class="btn-ghost btn-sm" style="font-size:10px; padding:4px 10px; border-radius:6px; font-weight:700; height:28px; font-family:'Space Grotesk',sans-serif;">Today</button>
+                <!-- Unit Switcher (Net SOL vs USD) -->
+                <div style="display:flex; align-items:center; background:rgba(255,255,255,0.06); border-radius:8px; padding:2px; border:1px solid rgba(255,255,255,0.1); gap:2px; height:28px;">
+                  <button type="button" id="pnl-unit-sol-btn" onclick="setPnlCalendarUnit('sol')" title="Tampilkan Hasil Bersih dalam SOL" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:var(--accent, #6366f1); color:#fff; transition:all 0.15s ease;">◎ SOL Bersih</button>
+                  <button type="button" id="pnl-unit-usd-btn" onclick="setPnlCalendarUnit('usd')" title="Tampilkan Hasil Bersih dalam USD" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:transparent; color:var(--text-secondary); transition:all 0.15s ease;">$ USD</button>
+                </div>
               </div>
 
               <!-- Month Summary Badges -->

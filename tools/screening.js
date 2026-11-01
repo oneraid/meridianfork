@@ -375,7 +375,7 @@ export async function fetchMeteoraPoolAth(poolAddress, timeframe = "1h") {
   }
 }
 
-export async function checkAthFilter(baseMint, poolDetail, minPctBelowAth, athSource = "meteora") {
+export async function checkAthFilter(baseMint, poolDetail, minPctBelowAth, athSource = "meteora", timeframe = "1h") {
   if (minPctBelowAth == null || minPctBelowAth <= 0) {
     return { pass: true };
   }
@@ -401,7 +401,7 @@ export async function checkAthFilter(baseMint, poolDetail, minPctBelowAth, athSo
   let metInfo = null;
   if (sourceSetting === "meteora" || sourceSetting === "both" || !gmgnInfo) {
     if (poolAddress) {
-      metInfo = await fetchMeteoraPoolAth(poolAddress);
+      metInfo = await fetchMeteoraPoolAth(poolAddress, timeframe || "1h");
     }
   }
 
@@ -501,7 +501,7 @@ async function enrichAthDetails(rawPools, s) {
   if (needMeteora && uniquePools.length > 0) {
     const metResults = await Promise.allSettled(
       uniquePools.map(async (poolAddr) => {
-        const res = await fetchMeteoraPoolAth(poolAddr, s.timeframe || "1h");
+        const res = await fetchMeteoraPoolAth(poolAddr, s.athTimeframe || "1h");
         return { poolAddr, res };
       })
     );

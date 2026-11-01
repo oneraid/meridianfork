@@ -186,12 +186,12 @@ The management cycle is **mostly deterministic in JS, LLM only for the hard case
 1. `getMyPositions({ force: true })` → snapshot.
 2. `recordPositionSnapshot` per pool.
 3. JS `updatePnlAndCheckExits(position, …)` for each:
-   - `STOP_LOSS` if `pnl_pct <= stopLossPct`
+   - `STOP_LOSS` if `pnl_pct <= stopLossPct` and position is OOR (out of range)
    - `TRAILING_TP` if `trailing_active && (peak - current) >= trailingDropPct` (queued for 15s recheck)
    - `OUT_OF_RANGE` if `minutes_out_of_range >= outOfRangeWaitMinutes`
    - `LOW_YIELD` if `fee_per_tvl_24h < minFeePerTvl24h && age >= minAgeBeforeYieldCheck`
 4. For positions with no exit alert: `getDeterministicCloseRule(p, mgmtConfig)` applies the **5 hard rules** (`index.js:895`):
-   - Rule 1: stop loss, Rule 2: take profit, Rule 3: pumped far above range, Rule 4: OOR wait, Rule 5: low yield.
+   - Rule 1: stop loss (only when OOR), Rule 2: take profit, Rule 3: pumped far above range, Rule 4: OOR wait, Rule 5: low yield.
 5. Positions needing `CLAIM` if `unclaimed_fees_usd >= minClaimAmount`.
 6. Positions with `instruction` set are marked `INSTRUCTION` and deferred to the LLM.
 7. **LLM is invoked only if any actionMap value is not `STAY`**, with a hard-coded goal that already lists positions + their assigned action. The LLM just executes (no re-evaluation). This saves tokens and prevents hallucinated rules.
