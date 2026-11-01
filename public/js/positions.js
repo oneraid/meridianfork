@@ -258,7 +258,7 @@ async function loadPositions() {
 
           // Col 7: Close Reason
           const tdReason = document.createElement("td");
-          tdReason.style.cssText = "font-size:12px;color:var(--text-muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+          tdReason.style.cssText = "font-size:12px;color:var(--text-muted);min-width:180px;max-width:320px;white-space:normal;word-break:break-word;vertical-align:middle;";
 
           let reasonStr = p.close_reason || "--";
           if (reasonStr === "--" && p.notes && p.notes.length > 0) {
@@ -289,10 +289,15 @@ async function loadPositions() {
           const matchColon = reasonStr.match(/^((?:Wallet|wallet)\s*\d+|Target\s+Wallet)\s*:\s*(.+)$/i);
           if (matchColon) {
             const wPart = matchColon[1].charAt(0).toUpperCase() + matchColon[1].slice(1);
-            tdReason.innerHTML = `<span style="color:var(--accent-light);font-weight:700;">${escapeHtml(wPart)} :</span> <span style="color:var(--text-secondary);">${escapeHtml(matchColon[2])}</span>`;
+            tdReason.innerHTML = `
+              <div style="font-weight:700;color:var(--accent-light);margin-bottom:3px;font-size:12px;">${escapeHtml(wPart)} :</div>
+              <div style="color:var(--text-secondary);line-height:1.4;font-size:12px;white-space:normal;word-break:break-word;">${escapeHtml(matchColon[2])}</div>
+            `;
             tdReason.title = reasonStr;
           } else {
-            tdReason.textContent = reasonStr;
+            tdReason.innerHTML = `<div style="color:var(--text-secondary);line-height:1.4;font-size:12px;white-space:normal;word-break:break-word;">${escapeHtml(reasonStr)}</div>`;
+            tdReason.title = reasonStr;
+          }
             tdReason.title = reasonStr;
           }
           tr.appendChild(tdReason);
